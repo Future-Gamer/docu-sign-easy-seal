@@ -3,13 +3,13 @@ import React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { FileText, User } from 'lucide-react';
+import { FileText, User, Trash2 } from 'lucide-react';
 
 interface Document {
   id: string;
   name: string;
   uploadDate: string;
-  status: 'pending' | 'signed' | 'completed';
+  status: 'pending' | 'signed' | 'completed' | 'active' | 'processing' | 'error';
   signers: string[];
   size: string;
 }
@@ -18,9 +18,10 @@ interface DocumentCardProps {
   document: Document;
   onView: (id: string) => void;
   onSign: (id: string) => void;
+  onDelete?: (id: string) => void;
 }
 
-const DocumentCard = ({ document, onView, onSign }: DocumentCardProps) => {
+const DocumentCard = ({ document, onView, onSign, onDelete }: DocumentCardProps) => {
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'pending':
@@ -29,6 +30,12 @@ const DocumentCard = ({ document, onView, onSign }: DocumentCardProps) => {
         return 'bg-blue-100 text-blue-800';
       case 'completed':
         return 'bg-green-100 text-green-800';
+      case 'active':
+        return 'bg-green-100 text-green-800';
+      case 'processing':
+        return 'bg-orange-100 text-orange-800';
+      case 'error':
+        return 'bg-red-100 text-red-800';
       default:
         return 'bg-gray-100 text-gray-800';
     }
@@ -51,9 +58,21 @@ const DocumentCard = ({ document, onView, onSign }: DocumentCardProps) => {
               </CardDescription>
             </div>
           </div>
-          <Badge className={getStatusColor(document.status)}>
-            {document.status.charAt(0).toUpperCase() + document.status.slice(1)}
-          </Badge>
+          <div className="flex items-center space-x-2">
+            <Badge className={getStatusColor(document.status)}>
+              {document.status.charAt(0).toUpperCase()+ document.status.slice(1)}
+            </Badge>
+            {onDelete && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => onDelete(document.id)}
+                className="text-red-600 hover:text-red-800 hover:bg-red-50"
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            )}
+          </div>
         </div>
       </CardHeader>
       <CardContent className="pt-0">

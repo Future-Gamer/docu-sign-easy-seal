@@ -3,67 +3,50 @@ import React, { useState } from 'react';
 import Navbar from '@/components/Navbar';
 import LandingPage from '@/components/LandingPage';
 import Dashboard from '@/components/Dashboard';
+import PDFTools from '@/components/PDFTools';
 import AuthModal from '@/components/AuthModal';
-import { useToast } from '@/hooks/use-toast';
-
-interface User {
-  name: string;
-  email: string;
-}
+import { useAuth } from '@/contexts/AuthContext';
 
 const Index = () => {
-  const [user, setUser] = useState<User | null>(null);
+  const { user, signOut, loading } = useAuth();
   const [showAuthModal, setShowAuthModal] = useState(false);
-  const { toast } = useToast();
-
-  const handleLogin = (email: string, password: string) => {
-    // Mock login - in real app, this would call your API
-    console.log('Login attempt:', { email, password });
-    
-    // Simulate successful login
-    setUser({
-      name: email === 'demo@example.com' ? 'Demo User' : 'John Doe',
-      email: email
-    });
-    
-    setShowAuthModal(false);
-    toast({
-      title: 'Welcome back!',
-      description: 'You have successfully signed in.',
-    });
-  };
-
-  const handleRegister = (name: string, email: string, password: string) => {
-    // Mock registration - in real app, this would call your API
-    console.log('Registration attempt:', { name, email, password });
-    
-    // Simulate successful registration
-    setUser({ name, email });
-    setShowAuthModal(false);
-    toast({
-      title: 'Account created!',
-      description: 'Welcome to DocuSign Pro. You can now start uploading documents.',
-    });
-  };
-
-  const handleSignOut = () => {
-    setUser(null);
-    toast({
-      title: 'Signed out',
-      description: 'You have been successfully signed out.',
-    });
-  };
+  const [currentView, setCurrentView] = useState<'dashboard' | 'tools'>('dashboard');
 
   const handleGetStarted = () => {
     setShowAuthModal(true);
   };
 
+  const handleToolSelect = (tool: string) => {
+    console.log('Selected tool:', tool);
+    // This will be implemented in future iterations
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
-      <Navbar user={user} onSignOut={handleSignOut} />
+      <Navbar 
+        user={user} 
+        onSignOut={signOut}
+        currentView={currentView}
+        onViewChange={setCurrentView}
+      />
       
       {user ? (
-        <Dashboard user={user} />
+        currentView === 'dashboard' ? (
+          <Dashboard user={user} />
+        ) : (
+          <PDFTools onToolSelect={handleToolSelect} />
+        )
       ) : (
         <LandingPage onGetStarted={handleGetStarted} />
       )}
@@ -71,8 +54,6 @@ const Index = () => {
       <AuthModal
         isOpen={showAuthModal}
         onClose={() => setShowAuthModal(false)}
-        onLogin={handleLogin}
-        onRegister={handleRegister}
       />
     </div>
   );

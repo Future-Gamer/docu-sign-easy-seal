@@ -9,7 +9,163 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      [_ in never]: never
+      document_operations: {
+        Row: {
+          completed_at: string | null
+          created_at: string
+          id: string
+          input_documents: string[]
+          metadata: Json | null
+          operation_type: string
+          output_document: string | null
+          status: string
+          user_id: string
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string
+          id?: string
+          input_documents: string[]
+          metadata?: Json | null
+          operation_type: string
+          output_document?: string | null
+          status?: string
+          user_id: string
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string
+          id?: string
+          input_documents?: string[]
+          metadata?: Json | null
+          operation_type?: string
+          output_document?: string | null
+          status?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "document_operations_output_document_fkey"
+            columns: ["output_document"]
+            isOneToOne: false
+            referencedRelation: "documents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      documents: {
+        Row: {
+          created_at: string
+          file_path: string
+          file_size: number
+          id: string
+          mime_type: string
+          name: string
+          original_name: string
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          file_path: string
+          file_size: number
+          id?: string
+          mime_type: string
+          name: string
+          original_name: string
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          file_path?: string
+          file_size?: number
+          id?: string
+          mime_type?: string
+          name?: string
+          original_name?: string
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          created_at: string
+          full_name: string | null
+          id: string
+          updated_at: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string
+          full_name?: string | null
+          id: string
+          updated_at?: string
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string
+          full_name?: string | null
+          id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      signatures: {
+        Row: {
+          created_at: string
+          document_id: string
+          id: string
+          page_number: number
+          position_x: number
+          position_y: number
+          signature_data: Json
+          signed_at: string | null
+          signer_email: string
+          signer_name: string | null
+          status: string
+        }
+        Insert: {
+          created_at?: string
+          document_id: string
+          id?: string
+          page_number?: number
+          position_x: number
+          position_y: number
+          signature_data: Json
+          signed_at?: string | null
+          signer_email: string
+          signer_name?: string | null
+          status?: string
+        }
+        Update: {
+          created_at?: string
+          document_id?: string
+          id?: string
+          page_number?: number
+          position_x?: number
+          position_y?: number
+          signature_data?: Json
+          signed_at?: string | null
+          signer_email?: string
+          signer_name?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "signatures_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "documents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never

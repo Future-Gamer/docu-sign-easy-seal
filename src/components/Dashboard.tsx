@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -6,47 +5,20 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import DocumentCard from './DocumentCard';
 import DocumentUpload from './DocumentUpload';
 import { Plus, Search } from 'lucide-react';
+import { useDocuments } from '@/hooks/useDocuments';
 
 interface DashboardProps {
-  user: { name: string; email: string };
+  user: { id: string; email?: string };
 }
 
 const Dashboard = ({ user }: DashboardProps) => {
+  const { documents, loading, uploadDocument, deleteDocument } = useDocuments();
   const [showUpload, setShowUpload] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
-  
-  // Mock documents data
-  const [documents] = useState([
-    {
-      id: '1',
-      name: 'Contract Agreement.pdf',
-      uploadDate: '2 days ago',
-      status: 'pending' as const,
-      signers: ['john@example.com'],
-      size: '2.4 MB'
-    },
-    {
-      id: '2',
-      name: 'Employment Agreement.pdf',
-      uploadDate: '1 week ago',
-      status: 'signed' as const,
-      signers: ['alice@example.com', 'bob@example.com'],
-      size: '1.8 MB'
-    },
-    {
-      id: '3',
-      name: 'NDA Document.pdf',
-      uploadDate: '2 weeks ago',
-      status: 'completed' as const,
-      signers: ['client@company.com'],
-      size: '890 KB'
-    }
-  ]);
 
-  const handleUpload = (file: File) => {
-    console.log('Uploading file:', file.name);
+  const handleUpload = async (file: File) => {
+    await uploadDocument(file);
     setShowUpload(false);
-    // Here you would typically handle the file upload to your backend
   };
 
   const handleViewDocument = (id: string) => {
@@ -60,7 +32,8 @@ const Dashboard = ({ user }: DashboardProps) => {
   };
 
   const filteredDocuments = documents.filter(doc =>
-    doc.name.toLowerCase().includes(searchTerm.toLowerCase())
+    doc.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    doc.original_name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   if (showUpload) {
@@ -85,7 +58,7 @@ const Dashboard = ({ user }: DashboardProps) => {
       <div className="mb-8">
         <div className="flex justify-between items-center mb-6">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Welcome back, {user.name}!</h1>
+            <h1 className="text-2xl font-bold text-gray-900">Welcome back!</h1>
             <p className="text-gray-600">Manage your documents and signatures</p>
           </div>
           <Button onClick={() => setShowUpload(true)} className="flex items-center space-x-2">
@@ -110,20 +83,33 @@ const Dashboard = ({ user }: DashboardProps) => {
       <Tabs defaultValue="all" className="w-full">
         <TabsList className="mb-6">
           <TabsTrigger value="all">All Documents</TabsTrigger>
-          <TabsTrigger value="pending">Pending</TabsTrigger>
-          <TabsTrigger value="signed">Signed</TabsTrigger>
+          <TabsTrigger value="active">Active</TabsTrigger>
+          <TabsTrigger value="processing">Processing</TabsTrigger>
           <TabsTrigger value="completed">Completed</TabsTrigger>
         </TabsList>
 
         <TabsContent value="all" className="space-y-4">
-          {filteredDocuments.length > 0 ? (
+          {loading ? (
+            <div className="text-center py-12">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+              <p className="text-gray-500">Loading documents...</p>
+            </div>
+          ) : filteredDocuments.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {filteredDocuments.map((doc) => (
                 <DocumentCard
                   key={doc.id}
-                  document={doc}
+                  document={{
+                    id: doc.id,
+                    name: doc.name,
+                    uploadDate: new Date(doc.created_at).toLocaleDateString(),
+                    status: doc.status as 'pending' | 'signed' | 'completed',
+                    signers: [],
+                    size: `${(doc.file_size / 1024 / 1024).toFixed(2)} MB`
+                  }}
                   onView={handleViewDocument}
                   onSign={handleSignDocument}
+                  onDelete={() => deleteDocument(doc.id)}
                 />
               ))}
             </div>
@@ -134,31 +120,47 @@ const Dashboard = ({ user }: DashboardProps) => {
           )}
         </TabsContent>
 
-        <TabsContent value="pending" className="space-y-4">
+        <TabsContent value="active" className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {filteredDocuments
-              .filter(doc => doc.status === 'pending')
+              .filter(doc => doc.status === 'active')
               .map((doc) => (
                 <DocumentCard
                   key={doc.id}
-                  document={doc}
+                  document={{
+                    id: doc.id,
+                    name: doc.name,
+                    uploadDate: new Date(doc.created_at).toLocaleDateString(),
+                    status: doc.status as 'pending' | 'signed' | 'completed',
+                    signers: [],
+                    size: `${(doc.file_size / 1024 / 1024).toFixed(2)} MB`
+                  }}
                   onView={handleViewDocument}
                   onSign={handleSignDocument}
+                  onDelete={() => deleteDocument(doc.id)}
                 />
               ))}
           </div>
         </TabsContent>
 
-        <TabsContent value="signed" className="space-y-4">
+        <TabsContent value="processing" className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {filteredDocuments
-              .filter(doc => doc.status === 'signed')
+              .filter(doc => doc.status === 'processing')
               .map((doc) => (
                 <DocumentCard
                   key={doc.id}
-                  document={doc}
+                  document={{
+                    id: doc.id,
+                    name: doc.name,
+                    uploadDate: new Date(doc.created_at).toLocaleDateString(),
+                    status: doc.status as 'pending' | 'signed' | 'completed',
+                    signers: [],
+                    size: `${(doc.file_size / 1024 / 1024).toFixed(2)} MB`
+                  }}
                   onView={handleViewDocument}
                   onSign={handleSignDocument}
+                  onDelete={() => deleteDocument(doc.id)}
                 />
               ))}
           </div>
@@ -171,9 +173,17 @@ const Dashboard = ({ user }: DashboardProps) => {
               .map((doc) => (
                 <DocumentCard
                   key={doc.id}
-                  document={doc}
+                  document={{
+                    id: doc.id,
+                    name: doc.name,
+                    uploadDate: new Date(doc.created_at).toLocaleDateString(),
+                    status: doc.status as 'pending' | 'signed' | 'completed',
+                    signers: [],
+                    size: `${(doc.file_size / 1024 / 1024).toFixed(2)} MB`
+                  }}
                   onView={handleViewDocument}
                   onSign={handleSignDocument}
+                  onDelete={() => deleteDocument(doc.id)}
                 />
               ))}
           </div>
