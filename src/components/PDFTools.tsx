@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -17,7 +16,6 @@ import {
   Droplet,
   Shield,
   Hash,
-  Scanner,
   Search,
   Layers,
   BookOpen,
@@ -147,7 +145,7 @@ const PDFTools = ({ onToolSelect }: PDFToolsProps) => {
       id: 'scan-to-pdf',
       title: 'Scan to PDF',
       description: 'Capture document scans from your mobile device',
-      icon: <Scanner className="h-8 w-8 text-orange-500" />,
+      icon: <Search className="h-8 w-8 text-orange-500" />,
       color: 'hover:bg-orange-50'
     },
     {
