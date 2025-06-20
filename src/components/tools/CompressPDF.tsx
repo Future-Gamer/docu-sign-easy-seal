@@ -2,19 +2,17 @@
 import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Upload, Scissors, ArrowLeft, Download } from 'lucide-react';
+import { Upload, Archive, ArrowLeft, Download } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
-interface SplitPDFProps {
+interface CompressPDFProps {
   onBack: () => void;
 }
 
-const SplitPDF = ({ onBack }: SplitPDFProps) => {
+const CompressPDF = ({ onBack }: CompressPDFProps) => {
   const [file, setFile] = useState<File | null>(null);
-  const [pageRanges, setPageRanges] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
-  const [processedFiles, setProcessedFiles] = useState<Blob[]>([]);
+  const [processedFile, setProcessedFile] = useState<Blob | null>(null);
   const { toast } = useToast();
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -30,11 +28,11 @@ const SplitPDF = ({ onBack }: SplitPDFProps) => {
     }
   };
 
-  const handleSplit = async () => {
+  const handleCompress = async () => {
     if (!file) {
       toast({
         title: 'No file selected',
-        description: 'Please select a PDF file to split',
+        description: 'Please select a PDF file to compress',
         variant: 'destructive',
       });
       return;
@@ -42,34 +40,30 @@ const SplitPDF = ({ onBack }: SplitPDFProps) => {
 
     setIsProcessing(true);
     
-    // Simulate splitting process
+    // Simulate compression process
     setTimeout(() => {
-      // Create mock split files
-      const splitFiles = Array.from({ length: 3 }, () => 
-        new Blob([file], { type: 'application/pdf' })
-      );
-      setProcessedFiles(splitFiles);
+      // Create a mock compressed file (smaller size)
+      const compressedBlob = new Blob([file], { type: 'application/pdf' });
+      setProcessedFile(compressedBlob);
       setIsProcessing(false);
       toast({
-        title: 'PDF split successfully',
-        description: 'Your split PDF files are ready for download',
+        title: 'PDF compressed successfully',
+        description: 'Your compressed PDF is ready for download',
       });
     }, 3000);
   };
 
-  const handleDownloadAll = () => {
-    if (!processedFiles.length || !file) return;
+  const handleDownload = () => {
+    if (!processedFile || !file) return;
     
-    processedFiles.forEach((blob, index) => {
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `${file.name.replace('.pdf', '')}_part_${index + 1}.pdf`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-    });
+    const url = URL.createObjectURL(processedFile);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `compressed_${file.name}`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   };
 
   return (
@@ -88,18 +82,18 @@ const SplitPDF = ({ onBack }: SplitPDFProps) => {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center space-x-2">
-            <Scissors className="h-6 w-6 text-orange-600" />
-            <span>Split PDF</span>
+            <Archive className="h-6 w-6 text-yellow-600" />
+            <span>Compress PDF</span>
           </CardTitle>
           <CardDescription>
-            Extract pages from your PDF document
+            Reduce your PDF file size
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="border-2 border-dashed border-gray-600 rounded-lg p-8 text-center">
             <Upload className="h-12 w-12 text-gray-400 mx-auto mb-4" />
             <p className="text-lg font-medium text-gray-100 mb-2">
-              Select a PDF file to split
+              Select a PDF file to compress
             </p>
             <input
               type="file"
@@ -119,8 +113,8 @@ const SplitPDF = ({ onBack }: SplitPDFProps) => {
             <div className="space-y-4">
               <div className="p-4 bg-gray-800 rounded-lg">
                 <div className="flex items-center space-x-3">
-                  <div className="bg-orange-100 p-2 rounded">
-                    <Scissors className="h-4 w-4 text-orange-600" />
+                  <div className="bg-yellow-100 p-2 rounded">
+                    <Archive className="h-4 w-4 text-yellow-600" />
                   </div>
                   <div>
                     <p className="font-medium text-white">{file.name}</p>
@@ -131,46 +125,22 @@ const SplitPDF = ({ onBack }: SplitPDFProps) => {
                 </div>
               </div>
 
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">
-                    Split by page ranges (e.g., 1-3, 5-7, 10)
-                  </label>
-                  <Input
-                    placeholder="Enter page ranges: 1-3, 5-7, 10"
-                    value={pageRanges}
-                    onChange={(e) => setPageRanges(e.target.value)}
-                  />
-                  <p className="text-xs text-gray-400 mt-1">
-                    Use commas to separate ranges. Example: 1-3, 5-7, 10
-                  </p>
-                </div>
-              </div>
-
-              {processedFiles.length === 0 ? (
+              {!processedFile ? (
                 <Button
-                  onClick={handleSplit}
+                  onClick={handleCompress}
                   disabled={isProcessing}
                   className="w-full"
                 >
-                  {isProcessing ? 'Splitting...' : 'Split PDF'}
+                  {isProcessing ? 'Compressing...' : 'Compress PDF'}
                 </Button>
               ) : (
-                <div className="space-y-4">
-                  <div className="p-4 bg-gray-800 rounded-lg">
-                    <p className="text-white mb-2">Split Complete!</p>
-                    <p className="text-sm text-gray-400">
-                      {processedFiles.length} PDF files ready for download
-                    </p>
-                  </div>
-                  <Button
-                    onClick={handleDownloadAll}
-                    className="w-full"
-                  >
-                    <Download className="h-4 w-4 mr-2" />
-                    Download All Split Files
-                  </Button>
-                </div>
+                <Button
+                  onClick={handleDownload}
+                  className="w-full"
+                >
+                  <Download className="h-4 w-4 mr-2" />
+                  Download Compressed PDF
+                </Button>
               )}
             </div>
           )}
@@ -180,4 +150,4 @@ const SplitPDF = ({ onBack }: SplitPDFProps) => {
   );
 };
 
-export default SplitPDF;
+export default CompressPDF;

@@ -2,17 +2,15 @@
 import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Upload, Scissors, ArrowLeft, Download } from 'lucide-react';
+import { Upload, FileImage, ArrowLeft, Download } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
-interface SplitPDFProps {
+interface PDFToJPGProps {
   onBack: () => void;
 }
 
-const SplitPDF = ({ onBack }: SplitPDFProps) => {
+const PDFToJPG = ({ onBack }: PDFToJPGProps) => {
   const [file, setFile] = useState<File | null>(null);
-  const [pageRanges, setPageRanges] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [processedFiles, setProcessedFiles] = useState<Blob[]>([]);
   const { toast } = useToast();
@@ -30,11 +28,11 @@ const SplitPDF = ({ onBack }: SplitPDFProps) => {
     }
   };
 
-  const handleSplit = async () => {
+  const handleConvert = async () => {
     if (!file) {
       toast({
         title: 'No file selected',
-        description: 'Please select a PDF file to split',
+        description: 'Please select a PDF file to convert',
         variant: 'destructive',
       });
       return;
@@ -42,17 +40,17 @@ const SplitPDF = ({ onBack }: SplitPDFProps) => {
 
     setIsProcessing(true);
     
-    // Simulate splitting process
+    // Simulate conversion process
     setTimeout(() => {
-      // Create mock split files
-      const splitFiles = Array.from({ length: 3 }, () => 
-        new Blob([file], { type: 'application/pdf' })
+      // Create mock JPG files (simulating 3 pages)
+      const mockImages = Array.from({ length: 3 }, (_, i) => 
+        new Blob([`mock image data for page ${i + 1}`], { type: 'image/jpeg' })
       );
-      setProcessedFiles(splitFiles);
+      setProcessedFiles(mockImages);
       setIsProcessing(false);
       toast({
-        title: 'PDF split successfully',
-        description: 'Your split PDF files are ready for download',
+        title: 'PDF converted successfully',
+        description: 'Your JPG images are ready for download',
       });
     }, 3000);
   };
@@ -64,7 +62,7 @@ const SplitPDF = ({ onBack }: SplitPDFProps) => {
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `${file.name.replace('.pdf', '')}_part_${index + 1}.pdf`;
+      a.download = `${file.name.replace('.pdf', '')}_page_${index + 1}.jpg`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -88,18 +86,18 @@ const SplitPDF = ({ onBack }: SplitPDFProps) => {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center space-x-2">
-            <Scissors className="h-6 w-6 text-orange-600" />
-            <span>Split PDF</span>
+            <FileImage className="h-6 w-6 text-green-600" />
+            <span>PDF to JPG</span>
           </CardTitle>
           <CardDescription>
-            Extract pages from your PDF document
+            Convert PDF pages to JPG images
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="border-2 border-dashed border-gray-600 rounded-lg p-8 text-center">
             <Upload className="h-12 w-12 text-gray-400 mx-auto mb-4" />
             <p className="text-lg font-medium text-gray-100 mb-2">
-              Select a PDF file to split
+              Select a PDF file to convert
             </p>
             <input
               type="file"
@@ -119,8 +117,8 @@ const SplitPDF = ({ onBack }: SplitPDFProps) => {
             <div className="space-y-4">
               <div className="p-4 bg-gray-800 rounded-lg">
                 <div className="flex items-center space-x-3">
-                  <div className="bg-orange-100 p-2 rounded">
-                    <Scissors className="h-4 w-4 text-orange-600" />
+                  <div className="bg-green-100 p-2 rounded">
+                    <FileImage className="h-4 w-4 text-green-600" />
                   </div>
                   <div>
                     <p className="font-medium text-white">{file.name}</p>
@@ -131,36 +129,20 @@ const SplitPDF = ({ onBack }: SplitPDFProps) => {
                 </div>
               </div>
 
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">
-                    Split by page ranges (e.g., 1-3, 5-7, 10)
-                  </label>
-                  <Input
-                    placeholder="Enter page ranges: 1-3, 5-7, 10"
-                    value={pageRanges}
-                    onChange={(e) => setPageRanges(e.target.value)}
-                  />
-                  <p className="text-xs text-gray-400 mt-1">
-                    Use commas to separate ranges. Example: 1-3, 5-7, 10
-                  </p>
-                </div>
-              </div>
-
               {processedFiles.length === 0 ? (
                 <Button
-                  onClick={handleSplit}
+                  onClick={handleConvert}
                   disabled={isProcessing}
                   className="w-full"
                 >
-                  {isProcessing ? 'Splitting...' : 'Split PDF'}
+                  {isProcessing ? 'Converting...' : 'Convert to JPG'}
                 </Button>
               ) : (
                 <div className="space-y-4">
                   <div className="p-4 bg-gray-800 rounded-lg">
-                    <p className="text-white mb-2">Split Complete!</p>
+                    <p className="text-white mb-2">Conversion Complete!</p>
                     <p className="text-sm text-gray-400">
-                      {processedFiles.length} PDF files ready for download
+                      {processedFiles.length} JPG files ready for download
                     </p>
                   </div>
                   <Button
@@ -168,7 +150,7 @@ const SplitPDF = ({ onBack }: SplitPDFProps) => {
                     className="w-full"
                   >
                     <Download className="h-4 w-4 mr-2" />
-                    Download All Split Files
+                    Download All JPG Files
                   </Button>
                 </div>
               )}
@@ -180,4 +162,4 @@ const SplitPDF = ({ onBack }: SplitPDFProps) => {
   );
 };
 
-export default SplitPDF;
+export default PDFToJPG;

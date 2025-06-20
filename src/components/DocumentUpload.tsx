@@ -4,6 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { FileText, Upload, X } from 'lucide-react';
+import PDFPreview from './PDFPreview';
 
 interface DocumentUploadProps {
   onUpload: (file: File) => void;
@@ -13,6 +14,7 @@ const DocumentUpload = ({ onUpload }: DocumentUploadProps) => {
   const [isDragOver, setIsDragOver] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [isUploading, setIsUploading] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -32,18 +34,20 @@ const DocumentUpload = ({ onUpload }: DocumentUploadProps) => {
     const pdfFile = files.find(file => file.type === 'application/pdf');
     
     if (pdfFile) {
-      handleFileUpload(pdfFile);
+      setSelectedFile(pdfFile);
     }
   }, []);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file && file.type === 'application/pdf') {
-      handleFileUpload(file);
+      setSelectedFile(file);
     }
   };
 
-  const handleFileUpload = async (file: File) => {
+  const handleFileUpload = async () => {
+    if (!selectedFile) return;
+    
     setIsUploading(true);
     setUploadProgress(0);
 
@@ -53,13 +57,32 @@ const DocumentUpload = ({ onUpload }: DocumentUploadProps) => {
         if (prev >= 100) {
           clearInterval(progressInterval);
           setIsUploading(false);
-          onUpload(file);
+          onUpload(selectedFile);
           return 100;
         }
         return prev + 10;
       });
     }, 200);
   };
+
+  const handleRemoveFile = () => {
+    setSelectedFile(null);
+    setUploadProgress(0);
+  };
+
+  if (selectedFile && !isUploading && uploadProgress < 100) {
+    return (
+      <div className="space-y-6">
+        <PDFPreview file={selectedFile} onRemove={handleRemoveFile} />
+        <div className="text-center">
+          <Button onClick={handleFileUpload} size="lg">
+            <Upload className="h-4 w-4 mr-2" />
+            Upload Document
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <Card className="w-full max-w-2xl mx-auto">
@@ -77,7 +100,7 @@ const DocumentUpload = ({ onUpload }: DocumentUploadProps) => {
           className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
             isDragOver
               ? 'border-blue-500 bg-blue-50'
-              : 'border-gray-300 hover:border-gray-400'
+              : 'border-gray-600 hover:border-gray-400'
           }`}
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
@@ -87,7 +110,7 @@ const DocumentUpload = ({ onUpload }: DocumentUploadProps) => {
             <div className="space-y-4">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
               <div className="space-y-2">
-                <p className="text-sm text-gray-600">Uploading document...</p>
+                <p className="text-sm text-gray-400">Uploading document...</p>
                 <Progress value={uploadProgress} className="w-full" />
                 <p className="text-xs text-gray-500">{uploadProgress}% complete</p>
               </div>
@@ -96,10 +119,10 @@ const DocumentUpload = ({ onUpload }: DocumentUploadProps) => {
             <div className="space-y-4">
               <FileText className="h-12 w-12 text-gray-400 mx-auto" />
               <div className="space-y-2">
-                <p className="text-lg font-medium text-gray-900">
+                <p className="text-lg font-medium text-gray-100">
                   Drop your PDF here, or browse
                 </p>
-                <p className="text-sm text-gray-500">
+                <p className="text-sm text-gray-400">
                   Supports PDF files up to 10MB
                 </p>
               </div>

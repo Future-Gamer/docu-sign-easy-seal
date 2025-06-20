@@ -6,6 +6,11 @@ import Dashboard from '@/components/Dashboard';
 import PDFTools from '@/components/PDFTools';
 import MergePDF from '@/components/tools/MergePDF';
 import SplitPDF from '@/components/tools/SplitPDF';
+import CompressPDF from '@/components/tools/CompressPDF';
+import PDFToJPG from '@/components/tools/PDFToJPG';
+import WordToPDF from '@/components/tools/WordToPDF';
+import SignPDF from '@/components/tools/SignPDF';
+import WatermarkPDF from '@/components/tools/WatermarkPDF';
 import AuthModal from '@/components/AuthModal';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -30,10 +35,10 @@ const Index = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gray-900 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading...</p>
+          <p className="text-gray-400">Loading...</p>
         </div>
       </div>
     );
@@ -45,13 +50,23 @@ const Index = () => {
         return <MergePDF onBack={handleBackToTools} />;
       case 'split':
         return <SplitPDF onBack={handleBackToTools} />;
+      case 'compress':
+        return <CompressPDF onBack={handleBackToTools} />;
+      case 'pdf-to-jpg':
+        return <PDFToJPG onBack={handleBackToTools} />;
+      case 'word-to-pdf':
+        return <WordToPDF onBack={handleBackToTools} />;
+      case 'sign-pdf':
+        return <SignPDF onBack={handleBackToTools} />;
+      case 'watermark':
+        return <WatermarkPDF onBack={handleBackToTools} />;
       default:
         return (
           <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8 text-center">
-            <h2 className="text-2xl font-bold text-gray-900 mb-4">
+            <h2 className="text-2xl font-bold text-gray-100 mb-4">
               {selectedTool?.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase())} Tool
             </h2>
-            <p className="text-gray-600 mb-6">
+            <p className="text-gray-400 mb-6">
               This tool is coming soon! We're working hard to implement all PDF features.
             </p>
             <button
@@ -66,7 +81,7 @@ const Index = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-900">
       <Navbar 
         user={user} 
         onSignOut={signOut}
