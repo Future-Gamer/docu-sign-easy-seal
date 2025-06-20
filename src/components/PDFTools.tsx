@@ -6,7 +6,7 @@ import {
   FileText, 
   Scissors, 
   Merge, 
-  Compress, 
+  Archive, 
   FileImage, 
   Edit3, 
   RotateCw, 
@@ -39,7 +39,7 @@ const PDFTools = ({ onToolSelect }: PDFToolsProps) => {
       id: 'compress',
       title: 'Compress PDF',
       description: 'Reduce your PDF file size',
-      icon: <Compress className="h-8 w-8 text-yellow-600" />,
+      icon: <Archive className="h-8 w-8 text-yellow-600" />,
       color: 'hover:bg-yellow-50'
     },
     {
