@@ -69,7 +69,7 @@ export const useDocuments = () => {
           file_path: fileName,
           file_size: file.size,
           mime_type: file.type,
-          status: 'active'
+          status: file.name.includes('signed_') || file.name.includes('merged_') || file.name.includes('compressed_') ? 'completed' : 'active'
         })
         .select()
         .single();
@@ -98,6 +98,8 @@ export const useDocuments = () => {
     const { data } = supabase.storage
       .from('documents')
       .getPublicUrl(filePath);
+    
+    console.log('Generated URL:', data.publicUrl);
     return data.publicUrl;
   };
 

@@ -29,11 +29,19 @@ const DocumentViewer: React.FC<DocumentViewerProps> = ({
   const [pdfUrl, setPdfUrl] = useState<string>('');
 
   useEffect(() => {
-    // Ensure the PDF URL is properly formatted for iframe viewing
     if (documentUrl) {
-      // Add #toolbar=0 to hide PDF toolbar and make it embeddable
-      const url = documentUrl.includes('#') ? documentUrl : `${documentUrl}#toolbar=0`;
-      setPdfUrl(url);
+      // Create a proper URL for viewing PDFs in iframe
+      let viewUrl = documentUrl;
+      
+      // If it's a Supabase storage URL, ensure it's properly formatted
+      if (documentUrl.includes('supabase')) {
+        viewUrl = `${documentUrl}#view=FitH`;
+      } else {
+        viewUrl = `${documentUrl}#toolbar=0&view=FitH`;
+      }
+      
+      setPdfUrl(viewUrl);
+      console.log('Document URL:', viewUrl);
     }
   }, [documentUrl]);
 
@@ -71,9 +79,9 @@ const DocumentViewer: React.FC<DocumentViewerProps> = ({
   };
 
   return (
-    <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div className="max-w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 bg-white min-h-screen">
       <div className="mb-6 flex justify-between items-center">
-        <Button variant="outline" onClick={onBack}>
+        <Button variant="outline" onClick={onBack} className="border-gray-300">
           <ArrowLeft className="h-4 w-4 mr-2" />
           Back
         </Button>
@@ -82,6 +90,7 @@ const DocumentViewer: React.FC<DocumentViewerProps> = ({
             <Button
               variant="outline"
               onClick={() => setShowSignatureCanvas(!showSignatureCanvas)}
+              className="border-gray-300"
             >
               <PenTool className="h-4 w-4 mr-2" />
               Add Signature
@@ -94,50 +103,58 @@ const DocumentViewer: React.FC<DocumentViewerProps> = ({
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-        <div className="lg:col-span-3">
-          <Card>
-            <CardHeader>
-              <CardTitle>{documentName}</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="relative bg-white rounded-lg overflow-hidden border" style={{ minHeight: '600px' }}>
-                {pdfUrl ? (
-                  <iframe
-                    src={pdfUrl}
-                    className="w-full h-full min-h-[600px]"
-                    title="Document Preview"
-                    style={{ border: 'none' }}
-                  />
-                ) : (
-                  <div className="flex items-center justify-center h-96">
-                    <p className="text-gray-500">Loading document...</p>
+      <div className="space-y-6">
+        <Card className="bg-white border-gray-200">
+          <CardHeader>
+            <CardTitle className="text-gray-900">{documentName}</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="relative bg-white rounded-lg overflow-hidden border border-gray-200 w-full" style={{ minHeight: '800px' }}>
+              {pdfUrl ? (
+                <iframe
+                  src={pdfUrl}
+                  className="w-full h-full min-h-[800px] border-0"
+                  title="Document Preview"
+                  onError={(e) => {
+                    console.error('PDF loading error:', e);
+                  }}
+                />
+              ) : (
+                <div className="flex items-center justify-center h-96 bg-gray-50">
+                  <div className="text-center">
+                    <p className="text-gray-500 mb-2">Loading document...</p>
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
                   </div>
-                )}
-                {signatures.map((sig) => (
-                  <DraggableSignature
-                    key={sig.id}
-                    signature={sig.signature}
-                    onPositionChange={(x, y) => handlePositionChange(sig.id, x, y)}
-                    onRemove={() => handleRemoveSignature(sig.id)}
-                    containerWidth={800}
-                    containerHeight={600}
-                  />
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+                </div>
+              )}
+              {signatures.map((sig) => (
+                <DraggableSignature
+                  key={sig.id}
+                  signature={sig.signature}
+                  initialX={sig.x}
+                  initialY={sig.y}
+                  onPositionChange={(x, y) => handlePositionChange(sig.id, x, y)}
+                  onRemove={() => handleRemoveSignature(sig.id)}
+                />
+              ))}
+            </div>
+          </CardContent>
+        </Card>
 
         {showSigningInterface && showSignatureCanvas && (
-          <div className="lg:col-span-1">
-            <SignatureCanvas onSignatureChange={handleSignatureChange} />
-            {currentSignature && (
-              <Button className="w-full mt-4" onClick={handleAddSignature}>
-                Add to Document
-              </Button>
-            )}
-          </div>
+          <Card className="bg-white border-gray-200">
+            <CardHeader>
+              <CardTitle>Create Signature</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <SignatureCanvas onSignatureChange={handleSignatureChange} />
+              {currentSignature && (
+                <Button className="w-full mt-4" onClick={handleAddSignature}>
+                  Add to Document
+                </Button>
+              )}
+            </CardContent>
+          </Card>
         )}
       </div>
     </div>
