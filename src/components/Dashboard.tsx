@@ -1,9 +1,11 @@
+
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import DocumentCard from './DocumentCard';
 import DocumentUpload from './DocumentUpload';
+import DocumentViewer from './DocumentViewer';
 import { Plus, Search } from 'lucide-react';
 import { useDocuments } from '@/hooks/useDocuments';
 
@@ -12,8 +14,9 @@ interface DashboardProps {
 }
 
 const Dashboard = ({ user }: DashboardProps) => {
-  const { documents, loading, uploadDocument, deleteDocument } = useDocuments();
+  const { documents, loading, uploadDocument, deleteDocument, getDocumentUrl } = useDocuments();
   const [showUpload, setShowUpload] = useState(false);
+  const [viewingDocument, setViewingDocument] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
 
   const handleUpload = async (file: File) => {
@@ -22,13 +25,24 @@ const Dashboard = ({ user }: DashboardProps) => {
   };
 
   const handleViewDocument = (id: string) => {
-    console.log('Viewing document:', id);
-    // Navigate to document viewer
+    setViewingDocument(id);
   };
 
   const handleSignDocument = (id: string) => {
-    console.log('Signing document:', id);
-    // Navigate to signature interface
+    setViewingDocument(id);
+  };
+
+  const handleDownloadDocument = (id: string) => {
+    const document = documents.find(doc => doc.id === id);
+    if (document) {
+      const url = getDocumentUrl(document.file_path);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = document.original_name;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
   };
 
   const filteredDocuments = documents.filter(doc =>
@@ -53,13 +67,28 @@ const Dashboard = ({ user }: DashboardProps) => {
     );
   }
 
+  if (viewingDocument) {
+    const document = documents.find(doc => doc.id === viewingDocument);
+    if (!document) return null;
+
+    return (
+      <DocumentViewer
+        documentUrl={getDocumentUrl(document.file_path)}
+        documentName={document.name}
+        onBack={() => setViewingDocument(null)}
+        onDownload={() => handleDownloadDocument(viewingDocument)}
+        showSigningInterface={true}
+      />
+    );
+  }
+
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <div className="mb-8">
         <div className="flex justify-between items-center mb-6">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Welcome back!</h1>
-            <p className="text-gray-600">Manage your documents and signatures</p>
+            <h1 className="text-2xl font-bold text-gray-100">Welcome back!</h1>
+            <p className="text-gray-400">Manage your documents and signatures</p>
           </div>
           <Button onClick={() => setShowUpload(true)} className="flex items-center space-x-2">
             <Plus className="h-4 w-4" />

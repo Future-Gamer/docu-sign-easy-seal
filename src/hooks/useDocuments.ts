@@ -47,7 +47,7 @@ export const useDocuments = () => {
   };
 
   const uploadDocument = async (file: File) => {
-    if (!user) return;
+    if (!user) return null;
 
     try {
       const fileName = `${user.id}/${Date.now()}-${file.name}`;
@@ -60,7 +60,7 @@ export const useDocuments = () => {
       if (uploadError) throw uploadError;
 
       // Save document metadata to database
-      const { error: dbError } = await supabase
+      const { data, error: dbError } = await supabase
         .from('documents')
         .insert({
           user_id: user.id,
@@ -70,7 +70,9 @@ export const useDocuments = () => {
           file_size: file.size,
           mime_type: file.type,
           status: 'active'
-        });
+        })
+        .select()
+        .single();
 
       if (dbError) throw dbError;
 
@@ -80,6 +82,7 @@ export const useDocuments = () => {
       });
 
       fetchDocuments();
+      return data;
     } catch (error) {
       console.error('Error uploading document:', error);
       toast({
@@ -87,13 +90,36 @@ export const useDocuments = () => {
         description: 'Failed to upload your document',
         variant: 'destructive',
       });
+      return null;
     }
+  };
+
+  const getDocumentUrl = (filePath: string) => {
+    const { data } = supabase.storage
+      .from('documents')
+      .getPublicUrl(filePath);
+    return data.publicUrl;
   };
 
   const deleteDocument = async (documentId: string) => {
     if (!user) return;
 
     try {
+      // Get document details first to delete from storage
+      const { data: document } = await supabase
+        .from('documents')
+        .select('file_path')
+        .eq('id', documentId)
+        .single();
+
+      if (document) {
+        // Delete from storage
+        await supabase.storage
+          .from('documents')
+          .remove([document.file_path]);
+      }
+
+      // Delete from database
       const { error } = await supabase
         .from('documents')
         .delete()
@@ -126,6 +152,7 @@ export const useDocuments = () => {
     loading,
     uploadDocument,
     deleteDocument,
+    getDocumentUrl,
     refetch: fetchDocuments
   };
 };

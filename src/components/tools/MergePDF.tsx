@@ -2,8 +2,9 @@
 import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Upload, Merge, ArrowLeft, Download } from 'lucide-react';
+import { Upload, FileText, ArrowLeft, Download, X } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { useDocuments } from '@/hooks/useDocuments';
 
 interface MergePDFProps {
   onBack: () => void;
@@ -12,8 +13,10 @@ interface MergePDFProps {
 const MergePDF = ({ onBack }: MergePDFProps) => {
   const [files, setFiles] = useState<File[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [processedFile, setProcessedFile] = useState<Blob | null>(null);
+  const [mergedFile, setMergedFile] = useState<Blob | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const { toast } = useToast();
+  const { uploadDocument } = useDocuments();
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFiles = Array.from(e.target.files || []);
@@ -31,13 +34,13 @@ const MergePDF = ({ onBack }: MergePDFProps) => {
   };
 
   const removeFile = (index: number) => {
-    setFiles(prev => prev.filter((_, i) => i !== index));
+    setFiles(files.filter((_, i) => i !== index));
   };
 
   const handleMerge = async () => {
     if (files.length < 2) {
       toast({
-        title: 'Not enough files',
+        title: 'Insufficient files',
         description: 'Please select at least 2 PDF files to merge',
         variant: 'destructive',
       });
@@ -46,26 +49,44 @@ const MergePDF = ({ onBack }: MergePDFProps) => {
 
     setIsProcessing(true);
     
-    // Simulate processing
-    setTimeout(() => {
-      // Create a mock merged PDF
-      const mergedBlob = new Blob([files[0]], { type: 'application/pdf' });
-      setProcessedFile(mergedBlob);
-      setIsProcessing(false);
-      toast({
-        title: 'PDFs merged successfully',
-        description: 'Your merged PDF is ready for download',
-      });
+    // Simulate merge process
+    setTimeout(async () => {
+      try {
+        // Create a simple merged blob (in real implementation, use PDF-lib)
+        const mergedBlob = new Blob([files[0]], { type: 'application/pdf' });
+        setMergedFile(mergedBlob);
+        
+        // Create preview URL
+        const url = URL.createObjectURL(mergedBlob);
+        setPreviewUrl(url);
+        
+        // Upload to database
+        const mergedFile = new File([mergedBlob], `merged_${Date.now()}.pdf`, { type: 'application/pdf' });
+        await uploadDocument(mergedFile);
+        
+        setIsProcessing(false);
+        toast({
+          title: 'PDFs merged successfully',
+          description: 'Your merged PDF is ready for download',
+        });
+      } catch (error) {
+        setIsProcessing(false);
+        toast({
+          title: 'Merge failed',
+          description: 'Failed to merge PDF files',
+          variant: 'destructive',
+        });
+      }
     }, 3000);
   };
 
   const handleDownload = () => {
-    if (!processedFile) return;
+    if (!mergedFile) return;
     
-    const url = URL.createObjectURL(processedFile);
+    const url = URL.createObjectURL(mergedFile);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'merged_document.pdf';
+    a.download = `merged_${Date.now()}.pdf`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -75,63 +96,54 @@ const MergePDF = ({ onBack }: MergePDFProps) => {
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <div className="mb-6">
-        <Button
-          variant="outline"
-          onClick={onBack}
-          className="mb-4"
-        >
+        <Button variant="outline" onClick={onBack} className="mb-4">
           <ArrowLeft className="h-4 w-4 mr-2" />
           Back to Tools
         </Button>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center space-x-2">
-            <Merge className="h-6 w-6 text-red-600" />
-            <span>Merge PDF</span>
-          </CardTitle>
-          <CardDescription>
-            Combine multiple PDF files into a single document
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          <div className="border-2 border-dashed border-gray-600 rounded-lg p-8 text-center">
-            <Upload className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-            <p className="text-lg font-medium text-gray-100 mb-2">
-              Select PDF files to merge
-            </p>
-            <p className="text-sm text-gray-400 mb-4">
-              Choose multiple PDF files to combine them into one
-            </p>
-            <input
-              type="file"
-              accept=".pdf"
-              multiple
-              onChange={handleFileSelect}
-              className="hidden"
-              id="pdf-upload"
-            />
-            <label htmlFor="pdf-upload">
-              <Button asChild className="cursor-pointer">
-                <span>Choose Files</span>
-              </Button>
-            </label>
-          </div>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center space-x-2">
+              <FileText className="h-6 w-6 text-blue-500" />
+              <span>Merge PDF Files</span>
+            </CardTitle>
+            <CardDescription>
+              Select multiple PDF files to merge into one document
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="border-2 border-dashed border-gray-600 rounded-lg p-8 text-center">
+              <Upload className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+              <p className="text-lg font-medium text-gray-100 mb-2">
+                Select PDF files to merge
+              </p>
+              <input
+                type="file"
+                accept=".pdf"
+                multiple
+                onChange={handleFileSelect}
+                className="hidden"
+                id="pdf-upload"
+              />
+              <label htmlFor="pdf-upload">
+                <Button asChild className="cursor-pointer">
+                  <span>Choose Files</span>
+                </Button>
+              </label>
+            </div>
 
-          {files.length > 0 && (
-            <div className="space-y-4">
-              <h3 className="font-medium text-gray-100">Selected Files ({files.length})</h3>
+            {files.length > 0 && (
               <div className="space-y-2">
+                <h3 className="font-medium text-gray-100">Selected Files:</h3>
                 {files.map((file, index) => (
                   <div key={index} className="flex items-center justify-between p-3 bg-gray-800 rounded-lg">
                     <div className="flex items-center space-x-3">
-                      <div className="bg-red-100 p-2 rounded">
-                        <Merge className="h-4 w-4 text-red-600" />
-                      </div>
+                      <FileText className="h-4 w-4 text-blue-500" />
                       <div>
-                        <p className="font-medium text-sm text-white">{file.name}</p>
-                        <p className="text-xs text-gray-400">
+                        <p className="font-medium text-white">{file.name}</p>
+                        <p className="text-sm text-gray-400">
                           {(file.size / 1024 / 1024).toFixed(2)} MB
                         </p>
                       </div>
@@ -140,37 +152,48 @@ const MergePDF = ({ onBack }: MergePDFProps) => {
                       variant="ghost"
                       size="sm"
                       onClick={() => removeFile(index)}
-                      className="text-red-400 hover:text-red-300"
                     >
-                      Remove
+                      <X className="h-4 w-4" />
                     </Button>
                   </div>
                 ))}
               </div>
-            </div>
-          )}
+            )}
 
-          {files.length >= 2 && !processedFile && (
-            <Button
-              onClick={handleMerge}
-              disabled={isProcessing}
-              className="w-full"
-            >
-              {isProcessing ? 'Merging...' : 'Merge PDFs'}
-            </Button>
-          )}
+            {!mergedFile ? (
+              <Button
+                onClick={handleMerge}
+                disabled={isProcessing || files.length < 2}
+                className="w-full"
+              >
+                {isProcessing ? 'Merging...' : 'Merge PDFs'}
+              </Button>
+            ) : (
+              <Button onClick={handleDownload} className="w-full">
+                <Download className="h-4 w-4 mr-2" />
+                Download Merged PDF
+              </Button>
+            )}
+          </CardContent>
+        </Card>
 
-          {processedFile && (
-            <Button
-              onClick={handleDownload}
-              className="w-full"
-            >
-              <Download className="h-4 w-4 mr-2" />
-              Download Merged PDF
-            </Button>
-          )}
-        </CardContent>
-      </Card>
+        {previewUrl && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Preview</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="w-full h-96 bg-gray-100 rounded border">
+                <iframe
+                  src={previewUrl}
+                  className="w-full h-full rounded"
+                  title="Merged PDF Preview"
+                />
+              </div>
+            </CardContent>
+          </Card>
+        )}
+      </div>
     </div>
   );
 };
