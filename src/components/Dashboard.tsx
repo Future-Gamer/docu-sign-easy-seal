@@ -33,15 +33,15 @@ const Dashboard = ({ user }: DashboardProps) => {
   };
 
   const handleDownloadDocument = (id: string) => {
-    const document = documents.find(doc => doc.id === id);
-    if (document) {
-      const url = getDocumentUrl(document.file_path);
-      const link = document.createElement('a');
+    const doc = documents.find(doc => doc.id === id);
+    if (doc) {
+      const url = getDocumentUrl(doc.file_path);
+      const link = window.document.createElement('a');
       link.href = url;
-      link.download = document.original_name;
-      document.body.appendChild(link);
+      link.download = doc.original_name;
+      window.document.body.appendChild(link);
       link.click();
-      document.body.removeChild(link);
+      window.document.body.removeChild(link);
     }
   };
 
