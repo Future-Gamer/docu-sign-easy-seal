@@ -1,10 +1,10 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Upload, Scissors, ArrowLeft, Download } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { useDocuments } from '@/hooks/useDocuments';
 
 interface SplitPDFProps {
   onBack: () => void;
@@ -16,6 +16,7 @@ const SplitPDF = ({ onBack }: SplitPDFProps) => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [processedFiles, setProcessedFiles] = useState<Blob[]>([]);
   const { toast } = useToast();
+  const { documents } = useDocuments();
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];

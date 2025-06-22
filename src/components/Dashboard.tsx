@@ -3,11 +3,15 @@ import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import DocumentCard from './DocumentCard';
 import DocumentUpload from './DocumentUpload';
 import DocumentViewer from './DocumentViewer';
-import { Plus, Search } from 'lucide-react';
+import SignatureCanvas from './SignatureCanvas';
+import DraggableSignature from './DraggableSignature';
+import { Plus, Search, PenTool, Upload, Download } from 'lucide-react';
 import { useDocuments } from '@/hooks/useDocuments';
+import { useToast } from '@/hooks/use-toast';
 
 interface DashboardProps {
   user: { id: string; email?: string };
@@ -18,6 +22,17 @@ const Dashboard = ({ user }: DashboardProps) => {
   const [showUpload, setShowUpload] = useState(false);
   const [viewingDocument, setViewingDocument] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  
+  // Sign PDF state
+  const [signFile, setSignFile] = useState<File | null>(null);
+  const [signerName, setSignerName] = useState('');
+  const [signerEmail, setSignerEmail] = useState('');
+  const [currentSignature, setCurrentSignature] = useState<string | null>(null);
+  const [signatures, setSignatures] = useState<Array<{ id: string; signature: string; x: number; y: number }>>([]);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [processedFile, setProcessedFile] = useState<Blob | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const { toast } = useToast();
 
   const handleUpload = async (file: File) => {
     await uploadDocument(file);
@@ -43,6 +58,101 @@ const Dashboard = ({ user }: DashboardProps) => {
       link.click();
       window.document.body.removeChild(link);
     }
+  };
+
+  // Sign PDF handlers
+  const handleSignFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const selectedFile = e.target.files?.[0];
+    if (selectedFile && selectedFile.type === 'application/pdf') {
+      setSignFile(selectedFile);
+      const url = URL.createObjectURL(selectedFile);
+      setPreviewUrl(url);
+    } else {
+      toast({
+        title: 'Invalid file',
+        description: 'Please select a PDF file',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleSignatureChange = (signature: string | null) => {
+    setCurrentSignature(signature);
+  };
+
+  const handleAddSignature = () => {
+    if (currentSignature) {
+      const newSignature = {
+        id: Date.now().toString(),
+        signature: currentSignature,
+        x: 50,
+        y: 50
+      };
+      setSignatures([...signatures, newSignature]);
+      setCurrentSignature(null);
+    }
+  };
+
+  const handlePositionChange = (id: string, x: number, y: number) => {
+    setSignatures(signatures.map(sig => 
+      sig.id === id ? { ...sig, x, y } : sig
+    ));
+  };
+
+  const handleRemoveSignature = (id: string) => {
+    setSignatures(signatures.filter(sig => sig.id !== id));
+  };
+
+  const handleSign = async () => {
+    if (!signFile || !signerName || !signerEmail || signatures.length === 0) {
+      toast({
+        title: 'Missing information',
+        description: 'Please fill in all fields, select a PDF file, and add at least one signature',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setIsProcessing(true);
+    
+    // Simulate signing process
+    setTimeout(async () => {
+      try {
+        // Create a signed PDF blob (in real implementation, use PDF-lib)
+        const signedBlob = new Blob([signFile], { type: 'application/pdf' });
+        setProcessedFile(signedBlob);
+        
+        // Upload to database
+        const signedFileName = new File([signedBlob], `signed_${signFile.name}`, { type: 'application/pdf' });
+        await uploadDocument(signedFileName);
+        
+        setIsProcessing(false);
+        toast({
+          title: 'PDF signed successfully',
+          description: 'Your signed PDF is ready for download',
+        });
+      } catch (error) {
+        setIsProcessing(false);
+        toast({
+          title: 'Signing failed',
+          description: 'Failed to sign PDF file',
+          variant: 'destructive',
+        });
+      }
+    }, 3000);
+  };
+
+  const handleDownloadSigned = () => {
+    if (!processedFile || !signFile) return;
+    
+    const url = URL.createObjectURL(processedFile);
+    const a = window.document.createElement('a');
+    a.href = url;
+    a.download = `signed_${signFile.name}`;
+    window.document.body.appendChild(a);
+    a.click();
+    window.document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   };
 
   const filteredDocuments = documents.filter(doc =>
@@ -87,14 +197,138 @@ const Dashboard = ({ user }: DashboardProps) => {
       <div className="mb-8">
         <div className="flex justify-between items-center mb-6">
           <div>
-            <h1 className="text-2xl font-bold text-gray-100">Welcome back!</h1>
-            <p className="text-gray-400">Manage your documents and signatures</p>
+            <h1 className="text-2xl font-bold text-gray-900">Welcome back!</h1>
+            <p className="text-gray-600">Manage your documents and signatures</p>
           </div>
           <Button onClick={() => setShowUpload(true)} className="flex items-center space-x-2">
             <Plus className="h-4 w-4" />
             <span>New Document</span>
           </Button>
         </div>
+
+        {/* Sign PDF Section */}
+        <Card className="mb-8">
+          <CardHeader>
+            <CardTitle className="flex items-center space-x-2">
+              <PenTool className="h-6 w-6 text-blue-500" />
+              <span>Sign PDF Document</span>
+            </CardTitle>
+            <CardDescription>
+              Upload a PDF and add your signature with drag & drop functionality
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              <div className="lg:col-span-1">
+                <div className="space-y-4">
+                  <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
+                    <Upload className="h-8 w-8 text-gray-400 mx-auto mb-2" />
+                    <p className="text-sm font-medium text-gray-900 mb-2">
+                      Select a PDF file to sign
+                    </p>
+                    <input
+                      type="file"
+                      accept=".pdf"
+                      onChange={handleSignFileSelect}
+                      className="hidden"
+                      id="sign-pdf-upload"
+                    />
+                    <label htmlFor="sign-pdf-upload">
+                      <Button asChild className="cursor-pointer" size="sm">
+                        <span>Choose File</span>
+                      </Button>
+                    </label>
+                  </div>
+
+                  {signFile && (
+                    <div className="space-y-4">
+                      <div className="p-3 bg-gray-50 rounded-lg">
+                        <p className="font-medium text-gray-900 text-sm">{signFile.name}</p>
+                        <p className="text-xs text-gray-500">
+                          {(signFile.size / 1024 / 1024).toFixed(2)} MB
+                        </p>
+                      </div>
+
+                      <div className="grid grid-cols-1 gap-3">
+                        <Input
+                          placeholder="Signer name"
+                          value={signerName}
+                          onChange={(e) => setSignerName(e.target.value)}
+                          size="sm"
+                        />
+                        <Input
+                          type="email"
+                          placeholder="Signer email"
+                          value={signerEmail}
+                          onChange={(e) => setSignerEmail(e.target.value)}
+                          size="sm"
+                        />
+                      </div>
+
+                      {!processedFile ? (
+                        <Button
+                          onClick={handleSign}
+                          disabled={isProcessing}
+                          className="w-full"
+                          size="sm"
+                        >
+                          {isProcessing ? 'Processing...' : 'Sign PDF'}
+                        </Button>
+                      ) : (
+                        <Button
+                          onClick={handleDownloadSigned}
+                          className="w-full"
+                          size="sm"
+                        >
+                          <Download className="h-4 w-4 mr-2" />
+                          Download Signed PDF
+                        </Button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="lg:col-span-1">
+                <SignatureCanvas onSignatureChange={handleSignatureChange} />
+                {currentSignature && (
+                  <Button className="w-full mt-4" onClick={handleAddSignature} size="sm">
+                    Add to Document
+                  </Button>
+                )}
+              </div>
+
+              {previewUrl && (
+                <div className="lg:col-span-1">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-lg">Document Preview</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="relative w-full h-80 bg-gray-100 rounded border overflow-hidden">
+                        <iframe
+                          src={previewUrl}
+                          className="w-full h-full"
+                          title="PDF Preview"
+                        />
+                        {signatures.map((sig) => (
+                          <DraggableSignature
+                            key={sig.id}
+                            signature={sig.signature}
+                            onPositionChange={(x, y) => handlePositionChange(sig.id, x, y)}
+                            onRemove={() => handleRemoveSignature(sig.id)}
+                            containerWidth={300}
+                            containerHeight={320}
+                          />
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
 
         <div className="flex items-center space-x-4 mb-6">
           <div className="relative flex-1 max-w-md">

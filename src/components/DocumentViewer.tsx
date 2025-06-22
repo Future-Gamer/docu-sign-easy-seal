@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Download, ArrowLeft, PenTool } from 'lucide-react';
@@ -26,6 +26,16 @@ const DocumentViewer: React.FC<DocumentViewerProps> = ({
   const [currentSignature, setCurrentSignature] = useState<string | null>(null);
   const [signatures, setSignatures] = useState<Array<{ id: string; signature: string; x: number; y: number }>>([]);
   const [showSignatureCanvas, setShowSignatureCanvas] = useState(false);
+  const [pdfUrl, setPdfUrl] = useState<string>('');
+
+  useEffect(() => {
+    // Ensure the PDF URL is properly formatted for iframe viewing
+    if (documentUrl) {
+      // Add #toolbar=0 to hide PDF toolbar and make it embeddable
+      const url = documentUrl.includes('#') ? documentUrl : `${documentUrl}#toolbar=0`;
+      setPdfUrl(url);
+    }
+  }, [documentUrl]);
 
   const handleSignatureChange = (signature: string | null) => {
     setCurrentSignature(signature);
@@ -91,12 +101,19 @@ const DocumentViewer: React.FC<DocumentViewerProps> = ({
               <CardTitle>{documentName}</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="relative bg-gray-100 rounded-lg overflow-hidden" style={{ minHeight: '600px' }}>
-                <iframe
-                  src={documentUrl}
-                  className="w-full h-full min-h-[600px]"
-                  title="Document Preview"
-                />
+              <div className="relative bg-white rounded-lg overflow-hidden border" style={{ minHeight: '600px' }}>
+                {pdfUrl ? (
+                  <iframe
+                    src={pdfUrl}
+                    className="w-full h-full min-h-[600px]"
+                    title="Document Preview"
+                    style={{ border: 'none' }}
+                  />
+                ) : (
+                  <div className="flex items-center justify-center h-96">
+                    <p className="text-gray-500">Loading document...</p>
+                  </div>
+                )}
                 {signatures.map((sig) => (
                   <DraggableSignature
                     key={sig.id}

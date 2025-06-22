@@ -1,9 +1,9 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Upload, FileDown, ArrowLeft, Download } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { useDocuments } from '@/hooks/useDocuments';
 
 interface WordToPDFProps {
   onBack: () => void;
@@ -14,6 +14,7 @@ const WordToPDF = ({ onBack }: WordToPDFProps) => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [processedFile, setProcessedFile] = useState<Blob | null>(null);
   const { toast } = useToast();
+  const { documents } = useDocuments();
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
