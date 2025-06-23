@@ -95,12 +95,17 @@ export const useDocuments = () => {
   };
 
   const getDocumentUrl = (filePath: string) => {
-    const { data } = supabase.storage
-      .from('documents')
-      .getPublicUrl(filePath);
-    
-    console.log('Generated URL:', data.publicUrl);
-    return data.publicUrl;
+    try {
+      const { data } = supabase.storage
+        .from('documents')
+        .getPublicUrl(filePath);
+      
+      console.log('Generated URL:', data.publicUrl);
+      return data.publicUrl;
+    } catch (error) {
+      console.error('Error generating document URL:', error);
+      return '';
+    }
   };
 
   const deleteDocument = async (documentId: string) => {
