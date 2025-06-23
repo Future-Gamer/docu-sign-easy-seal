@@ -6,6 +6,7 @@ import { Upload, FileText, ArrowLeft, Download, X } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
 import { useToast } from '@/hooks/use-toast';
 import { useDocuments } from '@/hooks/useDocuments';
+import { PDFDocument } from 'pdf-lib';
 
 interface MergePDFProps {
   onBack: () => void;
@@ -39,7 +40,6 @@ const MergePDF = ({ onBack }: MergePDFProps) => {
       return;
     }
 
-    // Validate file sizes
     const oversizedFiles = pdfFiles.filter(file => !validateFileSize(file));
     if (oversizedFiles.length > 0) {
       toast({
@@ -57,6 +57,19 @@ const MergePDF = ({ onBack }: MergePDFProps) => {
     setFiles(files.filter((_, i) => i !== index));
   };
 
+  const actuallyMergePDFs = async (pdfFiles: File[]): Promise<Uint8Array> => {
+    const mergedPdf = await PDFDocument.create();
+
+    for (const file of pdfFiles) {
+      const arrayBuffer = await file.arrayBuffer();
+      const pdf = await PDFDocument.load(arrayBuffer);
+      const copiedPages = await mergedPdf.copyPages(pdf, pdf.getPageIndices());
+      copiedPages.forEach((page) => mergedPdf.addPage(page));
+    }
+
+    return await mergedPdf.save();
+  };
+
   const handleMerge = async () => {
     if (files.length < 2) {
       toast({
@@ -70,59 +83,44 @@ const MergePDF = ({ onBack }: MergePDFProps) => {
     setIsProcessing(true);
     setProgress(0);
     
-    // Simulate merge process with progress
-    const progressInterval = setInterval(() => {
-      setProgress(prev => {
-        if (prev >= 100) {
-          clearInterval(progressInterval);
-          return 100;
-        }
-        return prev + 10;
+    try {
+      // Update progress
+      setProgress(25);
+      
+      // Actually merge the PDFs using PDF-lib
+      const mergedPdfBytes = await actuallyMergePDFs(files);
+      setProgress(75);
+      
+      // Create blob from merged PDF
+      const mergedBlob = new Blob([mergedPdfBytes], { type: 'application/pdf' });
+      setMergedFile(mergedBlob);
+      
+      // Create preview URL
+      const url = URL.createObjectURL(mergedBlob);
+      setPreviewUrl(url);
+      setProgress(90);
+      
+      // Upload to database
+      const mergedFileName = new File([mergedBlob], `merged_${Date.now()}.pdf`, { type: 'application/pdf' });
+      await uploadDocument(mergedFileName);
+      
+      setProgress(100);
+      setIsProcessing(false);
+      setIsCompleted(true);
+      
+      toast({
+        title: 'PDFs merged successfully',
+        description: 'Your merged PDF is ready for download and has been saved to your documents',
       });
-    }, 300);
-
-    // Simulate merge process (in real implementation, use PDF-lib to actually merge PDFs)
-    setTimeout(async () => {
-      try {
-        // For now, create a simple merged blob (in production, use PDF-lib)
-        // This simulates merging by combining file data
-        const mergedContent = await Promise.all(
-          files.map(file => file.arrayBuffer())
-        );
-        
-        // Create a merged blob with combined size (simulation)
-        const totalSize = files.reduce((sum, file) => sum + file.size, 0);
-        const mergedBlob = new Blob([files[0]], { type: 'application/pdf' });
-        
-        setMergedFile(mergedBlob);
-        
-        // Create preview URL
-        const url = URL.createObjectURL(mergedBlob);
-        setPreviewUrl(url);
-        
-        // Upload to database
-        const mergedFileName = new File([mergedBlob], `merged_${Date.now()}.pdf`, { type: 'application/pdf' });
-        await uploadDocument(mergedFileName);
-        
-        setIsProcessing(false);
-        setIsCompleted(true);
-        clearInterval(progressInterval);
-        setProgress(100);
-        
-        toast({
-          title: 'PDFs merged successfully',
-          description: 'Your merged PDF is ready for download and has been saved to your documents',
-        });
-      } catch (error) {
-        setIsProcessing(false);
-        clearInterval(progressInterval);
-        toast({
-          title: 'Merge failed',
-          description: 'Failed to merge PDF files',
-          variant: 'destructive',
-        });
-      }
-    }, 3000);
+    } catch (error) {
+      console.error('Error merging PDFs:', error);
+      setIsProcessing(false);
+      toast({
+        title: 'Merge failed',
+        description: 'Failed to merge PDF files. Please try again.',
+        variant: 'destructive',
+      });
+    }
   };
 
   const handleDownload = () => {
@@ -157,7 +155,6 @@ const MergePDF = ({ onBack }: MergePDFProps) => {
       </div>
 
       <div className="space-y-6">
-        {/* Step 1: File Selection */}
         <Card className="border-gray-200 bg-white">
           <CardHeader>
             <CardTitle className="flex items-center space-x-2 text-gray-800">
@@ -221,7 +218,6 @@ const MergePDF = ({ onBack }: MergePDFProps) => {
           </CardContent>
         </Card>
 
-        {/* Step 2: Process */}
         {files.length >= 2 && (
           <Card className="border-gray-200 bg-white">
             <CardHeader>
@@ -289,7 +285,6 @@ const MergePDF = ({ onBack }: MergePDFProps) => {
           </Card>
         )}
 
-        {/* Step 3: Preview */}
         {previewUrl && (
           <Card className="border-gray-200 bg-white">
             <CardHeader>
