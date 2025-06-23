@@ -81,7 +81,7 @@ const DocumentViewer: React.FC<DocumentViewerProps> = ({
   return (
     <div className="max-w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 bg-white min-h-screen">
       <div className="mb-6 flex justify-between items-center">
-        <Button variant="outline" onClick={onBack} className="border-gray-300">
+        <Button variant="outline" onClick={onBack} className="border-gray-200 bg-white hover:bg-gray-50">
           <ArrowLeft className="h-4 w-4 mr-2" />
           Back
         </Button>
@@ -90,13 +90,13 @@ const DocumentViewer: React.FC<DocumentViewerProps> = ({
             <Button
               variant="outline"
               onClick={() => setShowSignatureCanvas(!showSignatureCanvas)}
-              className="border-gray-300"
+              className="border-gray-200 bg-white hover:bg-gray-50"
             >
               <PenTool className="h-4 w-4 mr-2" />
               Add Signature
             </Button>
           )}
-          <Button onClick={onDownload}>
+          <Button onClick={onDownload} className="bg-blue-500 hover:bg-blue-600">
             <Download className="h-4 w-4 mr-2" />
             Download
           </Button>
@@ -104,9 +104,9 @@ const DocumentViewer: React.FC<DocumentViewerProps> = ({
       </div>
 
       <div className="space-y-6">
-        <Card className="bg-white border-gray-200">
+        <Card className="bg-white border-gray-100 shadow-sm">
           <CardHeader>
-            <CardTitle className="text-gray-900">{documentName}</CardTitle>
+            <CardTitle className="text-gray-800">{documentName}</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="relative bg-white rounded-lg overflow-hidden border border-gray-200 w-full" style={{ minHeight: '800px' }}>
@@ -120,10 +120,10 @@ const DocumentViewer: React.FC<DocumentViewerProps> = ({
                   }}
                 />
               ) : (
-                <div className="flex items-center justify-center h-96 bg-gray-50">
+                <div className="flex items-center justify-center h-96 bg-gray-25">
                   <div className="text-center">
                     <p className="text-gray-500 mb-2">Loading document...</p>
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto"></div>
                   </div>
                 </div>
               )}
@@ -142,14 +142,14 @@ const DocumentViewer: React.FC<DocumentViewerProps> = ({
         </Card>
 
         {showSigningInterface && showSignatureCanvas && (
-          <Card className="bg-white border-gray-200">
+          <Card className="bg-white border-gray-100 shadow-sm">
             <CardHeader>
-              <CardTitle>Create Signature</CardTitle>
+              <CardTitle className="text-gray-800">Create Signature</CardTitle>
             </CardHeader>
             <CardContent>
               <SignatureCanvas onSignatureChange={handleSignatureChange} />
               {currentSignature && (
-                <Button className="w-full mt-4" onClick={handleAddSignature}>
+                <Button className="w-full mt-4 bg-blue-500 hover:bg-blue-600" onClick={handleAddSignature}>
                   Add to Document
                 </Button>
               )}

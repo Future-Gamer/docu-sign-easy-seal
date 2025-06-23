@@ -6,20 +6,20 @@ import { X, Move } from 'lucide-react';
 
 interface DraggableSignatureProps {
   signature: string;
+  initialX?: number;
+  initialY?: number;
   onPositionChange: (x: number, y: number) => void;
   onRemove: () => void;
-  containerWidth: number;
-  containerHeight: number;
 }
 
 const DraggableSignature: React.FC<DraggableSignatureProps> = ({
   signature,
+  initialX = 50,
+  initialY = 50,
   onPositionChange,
-  onRemove,
-  containerWidth,
-  containerHeight
+  onRemove
 }) => {
-  const [position, setPosition] = useState({ x: 50, y: 50 });
+  const [position, setPosition] = useState({ x: initialX, y: initialY });
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const signatureRef = useRef<HTMLDivElement>(null);
@@ -35,8 +35,8 @@ const DraggableSignature: React.FC<DraggableSignatureProps> = ({
   const handleMouseMove = (e: React.MouseEvent) => {
     if (!isDragging) return;
 
-    const newX = Math.max(0, Math.min(containerWidth - 200, e.clientX - dragStart.x));
-    const newY = Math.max(0, Math.min(containerHeight - 100, e.clientY - dragStart.y));
+    const newX = Math.max(0, Math.min(800 - 200, e.clientX - dragStart.x));
+    const newY = Math.max(0, Math.min(600 - 100, e.clientY - dragStart.y));
     
     setPosition({ x: newX, y: newY });
     onPositionChange(newX, newY);
@@ -61,7 +61,7 @@ const DraggableSignature: React.FC<DraggableSignatureProps> = ({
       onMouseUp={handleMouseUp}
       onMouseLeave={handleMouseUp}
     >
-      <Card className="border-2 border-blue-500 bg-white/90 backdrop-blur-sm">
+      <Card className="border-2 border-blue-400 bg-white/95 backdrop-blur-sm shadow-lg">
         <CardContent className="p-2 relative">
           <Button
             variant="destructive"
