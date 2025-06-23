@@ -10,6 +10,8 @@ interface DraggableSignatureProps {
   initialY?: number;
   onPositionChange: (x: number, y: number) => void;
   onRemove: () => void;
+  containerWidth?: number;
+  containerHeight?: number;
 }
 
 const DraggableSignature: React.FC<DraggableSignatureProps> = ({
@@ -17,7 +19,9 @@ const DraggableSignature: React.FC<DraggableSignatureProps> = ({
   initialX = 50,
   initialY = 50,
   onPositionChange,
-  onRemove
+  onRemove,
+  containerWidth = 800,
+  containerHeight = 600
 }) => {
   const [position, setPosition] = useState({ x: initialX, y: initialY });
   const [isDragging, setIsDragging] = useState(false);
@@ -35,8 +39,8 @@ const DraggableSignature: React.FC<DraggableSignatureProps> = ({
   const handleMouseMove = (e: React.MouseEvent) => {
     if (!isDragging) return;
 
-    const newX = Math.max(0, Math.min(800 - 200, e.clientX - dragStart.x));
-    const newY = Math.max(0, Math.min(600 - 100, e.clientY - dragStart.y));
+    const newX = Math.max(0, Math.min(containerWidth - 200, e.clientX - dragStart.x));
+    const newY = Math.max(0, Math.min(containerHeight - 100, e.clientY - dragStart.y));
     
     setPosition({ x: newX, y: newY });
     onPositionChange(newX, newY);
