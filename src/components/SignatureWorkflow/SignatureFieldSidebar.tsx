@@ -16,12 +16,14 @@ interface SignatureFieldSidebarProps {
   onAddField: (fieldType: string) => void;
   requiredFields: SignatureField[];
   optionalFields: SignatureField[];
+  onSign: () => void;
 }
 
 const SignatureFieldSidebar: React.FC<SignatureFieldSidebarProps> = ({
   onAddField,
   requiredFields,
-  optionalFields
+  optionalFields,
+  onSign
 }) => {
   const renderField = (field: SignatureField, index: number) => (
     <div key={field.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
@@ -96,7 +98,10 @@ const SignatureFieldSidebar: React.FC<SignatureFieldSidebarProps> = ({
 
       {/* Sign Button */}
       <div className="p-4 border-t">
-        <Button className="w-full bg-red-500 hover:bg-red-600 text-white h-12 text-lg">
+        <Button 
+          onClick={onSign}
+          className="w-full bg-red-500 hover:bg-red-600 text-white h-12 text-lg"
+        >
           Sign →
         </Button>
       </div>

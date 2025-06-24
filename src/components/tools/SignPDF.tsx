@@ -377,6 +377,7 @@ const SignPDF = ({ onBack }: SignPDFProps) => {
               onAddField={handleAddField}
               requiredFields={requiredFields}
               optionalFields={optionalFields}
+              onSign={handleSign}
             />
           </>
         )}

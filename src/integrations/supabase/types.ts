@@ -116,45 +116,164 @@ export type Database = {
         }
         Relationships: []
       }
+      signature_fields: {
+        Row: {
+          assigned_to: string | null
+          created_at: string | null
+          field_type: string
+          height: number | null
+          id: string
+          is_required: boolean | null
+          label: string | null
+          page_number: number | null
+          position_x: number
+          position_y: number
+          session_id: string | null
+          width: number | null
+        }
+        Insert: {
+          assigned_to?: string | null
+          created_at?: string | null
+          field_type: string
+          height?: number | null
+          id?: string
+          is_required?: boolean | null
+          label?: string | null
+          page_number?: number | null
+          position_x: number
+          position_y: number
+          session_id?: string | null
+          width?: number | null
+        }
+        Update: {
+          assigned_to?: string | null
+          created_at?: string | null
+          field_type?: string
+          height?: number | null
+          id?: string
+          is_required?: boolean | null
+          label?: string | null
+          page_number?: number | null
+          position_x?: number
+          position_y?: number
+          session_id?: string | null
+          width?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "signature_fields_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "signature_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      signature_sessions: {
+        Row: {
+          created_at: string | null
+          created_by: string | null
+          document_id: string | null
+          id: string
+          session_type: string
+          status: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          created_by?: string | null
+          document_id?: string | null
+          id?: string
+          session_type?: string
+          status?: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string | null
+          document_id?: string | null
+          id?: string
+          session_type?: string
+          status?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "signature_sessions_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "signature_sessions_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "documents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       signatures: {
         Row: {
+          color: string | null
           created_at: string
           document_id: string
+          field_type: string | null
+          font_style: string | null
+          height: number | null
           id: string
+          is_required: boolean | null
           page_number: number
           position_x: number
           position_y: number
           signature_data: Json
+          signature_type: string | null
           signed_at: string | null
           signer_email: string
           signer_name: string | null
           status: string
+          width: number | null
         }
         Insert: {
+          color?: string | null
           created_at?: string
           document_id: string
+          field_type?: string | null
+          font_style?: string | null
+          height?: number | null
           id?: string
+          is_required?: boolean | null
           page_number?: number
           position_x: number
           position_y: number
           signature_data: Json
+          signature_type?: string | null
           signed_at?: string | null
           signer_email: string
           signer_name?: string | null
           status?: string
+          width?: number | null
         }
         Update: {
+          color?: string | null
           created_at?: string
           document_id?: string
+          field_type?: string | null
+          font_style?: string | null
+          height?: number | null
           id?: string
+          is_required?: boolean | null
           page_number?: number
           position_x?: number
           position_y?: number
           signature_data?: Json
+          signature_type?: string | null
           signed_at?: string | null
           signer_email?: string
           signer_name?: string | null
           status?: string
+          width?: number | null
         }
         Relationships: [
           {
