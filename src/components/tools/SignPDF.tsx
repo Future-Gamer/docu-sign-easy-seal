@@ -1,37 +1,93 @@
 
 import React, { useState } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Upload, PenTool, ArrowLeft, Download, CheckCircle, FileText, Send } from 'lucide-react';
-import { Progress } from '@/components/ui/progress';
+import { ArrowLeft, Upload, FileText, Download, CheckCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import SignatureCanvas from '../SignatureCanvas';
-import PDFViewer from '../PDFViewer';
 import { PDFProcessor } from '@/services/pdfProcessor';
+import PDFViewer from '../PDFViewer';
+import SigningModeSelector from '../SignatureWorkflow/SigningModeSelector';
+import SignatureDetailsModal, { SignatureDetails } from '../SignatureWorkflow/SignatureDetailsModal';
+import SignatureFieldSidebar from '../SignatureWorkflow/SignatureFieldSidebar';
+import DraggableField from '../SignatureWorkflow/DraggableField';
 
 interface SignPDFProps {
   onBack: () => void;
 }
 
-type WorkflowStep = 'upload' | 'sign' | 'review' | 'complete';
+type WorkflowStep = 'upload' | 'mode-selection' | 'editor' | 'complete';
+
+interface SignatureField {
+  id: string;
+  type: 'signature' | 'initials' | 'name' | 'date' | 'text' | 'company_stamp';
+  label: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  pageNumber: number;
+  value?: string;
+  isRequired: boolean;
+}
 
 const SignPDF = ({ onBack }: SignPDFProps) => {
   const [currentStep, setCurrentStep] = useState<WorkflowStep>('upload');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [signerInfo, setSignerInfo] = useState({ name: '', email: '' });
-  const [signatures, setSignatures] = useState<Array<{ 
-    id: string; 
-    signature: string; 
-    x: number; 
-    y: number; 
-    pageNumber: number;
-  }>>([]);
-  const [currentSignature, setCurrentSignature] = useState<string | null>(null);
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [progress, setProgress] = useState(0);
+  const [signingMode, setSigningMode] = useState<'self' | 'multiple'>('self');
+  const [showSignatureModal, setShowSignatureModal] = useState(false);
+  const [signatureDetails, setSignatureDetails] = useState<SignatureDetails | null>(null);
+  const [signatureFields, setSignatureFields] = useState<SignatureField[]>([]);
   const [signedPdfBlob, setSignedPdfBlob] = useState<Blob | null>(null);
+  const [isProcessing, setIsProcessing] = useState(false);
   const { toast } = useToast();
+
+  // Predefined field templates
+  const requiredFields = [
+    {
+      id: 'signature',
+      type: 'signature' as const,
+      label: 'Signature',
+      icon: <div className="text-blue-500">✍️</div>,
+      isRequired: true
+    }
+  ];
+
+  const optionalFields = [
+    {
+      id: 'initials',
+      type: 'initials' as const,
+      label: 'Initials',
+      icon: <div className="text-green-500">AC</div>,
+      isRequired: false
+    },
+    {
+      id: 'name',
+      type: 'name' as const,
+      label: 'Name',
+      icon: <div className="text-purple-500">👤</div>,
+      isRequired: false
+    },
+    {
+      id: 'date',
+      type: 'date' as const,
+      label: 'Date',
+      icon: <div className="text-orange-500">📅</div>,
+      isRequired: false
+    },
+    {
+      id: 'text',
+      type: 'text' as const,
+      label: 'Text',
+      icon: <div className="text-gray-500">📝</div>,
+      isRequired: false
+    },
+    {
+      id: 'company_stamp',
+      type: 'company_stamp' as const,
+      label: 'Company Stamp',
+      icon: <div className="text-red-500">🏢</div>,
+      isRequired: false
+    }
+  ];
 
   // Step 1: File Upload
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -47,7 +103,7 @@ const SignPDF = ({ onBack }: SignPDFProps) => {
       return;
     }
 
-    if (file.size > 25 * 1024 * 1024) { // 25MB limit
+    if (file.size > 25 * 1024 * 1024) {
       toast({
         title: 'File too large',
         description: 'Please select a PDF file smaller than 25MB',
@@ -67,34 +123,40 @@ const SignPDF = ({ onBack }: SignPDFProps) => {
     }
 
     setSelectedFile(file);
-    setCurrentStep('sign');
-    toast({
-      title: 'PDF uploaded successfully',
-      description: 'You can now add your signature',
-    });
+    setCurrentStep('mode-selection');
   };
 
-  // Step 2: Add Signature
-  const handleAddSignature = () => {
-    if (!currentSignature) {
-      toast({
-        title: 'No signature',
-        description: 'Please create a signature first',
-        variant: 'destructive',
-      });
-      return;
-    }
+  // Step 2: Mode Selection
+  const handleModeSelection = (mode: 'self' | 'multiple') => {
+    setSigningMode(mode);
+    setCurrentStep('editor');
+    
+    // Auto-open signature details modal
+    setTimeout(() => {
+      setShowSignatureModal(true);
+    }, 500);
+  };
 
-    const newSignature = {
-      id: `sig_${Date.now()}`,
-      signature: currentSignature,
-      x: 20, // 20% from left
-      y: 20, // 20% from top
-      pageNumber: 1
+  // Step 3: Signature Details
+  const handleSignatureDetailsSave = (details: SignatureDetails) => {
+    setSignatureDetails(details);
+    setShowSignatureModal(false);
+    
+    // Auto-add signature field
+    const signatureField: SignatureField = {
+      id: `signature_${Date.now()}`,
+      type: 'signature',
+      label: 'Signature',
+      x: 20,
+      y: 70,
+      width: 200,
+      height: 80,
+      pageNumber: 1,
+      value: details.signatureData || details.fullName,
+      isRequired: true
     };
-
-    setSignatures([...signatures, newSignature]);
-    setCurrentSignature(null);
+    
+    setSignatureFields([signatureField]);
     
     toast({
       title: 'Signature added',
@@ -102,94 +164,101 @@ const SignPDF = ({ onBack }: SignPDFProps) => {
     });
   };
 
-  const handleSignaturePositionChange = (id: string, x: number, y: number) => {
-    setSignatures(prev => prev.map(sig => 
-      sig.id === id ? { ...sig, x, y } : sig
+  // Field Management
+  const handleAddField = (fieldType: string) => {
+    if (!signatureDetails) {
+      setShowSignatureModal(true);
+      return;
+    }
+
+    const newField: SignatureField = {
+      id: `${fieldType}_${Date.now()}`,
+      type: fieldType as any,
+      label: fieldType.charAt(0).toUpperCase() + fieldType.slice(1),
+      x: 20,
+      y: 20,
+      width: fieldType === 'signature' ? 200 : fieldType === 'initials' ? 100 : 150,
+      height: fieldType === 'signature' ? 80 : 50,
+      pageNumber: 1,
+      value: getFieldValue(fieldType),
+      isRequired: fieldType === 'signature'
+    };
+
+    setSignatureFields(prev => [...prev, newField]);
+  };
+
+  const getFieldValue = (fieldType: string): string => {
+    if (!signatureDetails) return '';
+    
+    switch (fieldType) {
+      case 'signature':
+        return signatureDetails.signatureData || signatureDetails.fullName;
+      case 'initials':
+        return signatureDetails.initials;
+      case 'name':
+        return signatureDetails.fullName;
+      case 'date':
+        return new Date().toLocaleDateString();
+      default:
+        return '';
+    }
+  };
+
+  const handleFieldPositionChange = (id: string, x: number, y: number) => {
+    setSignatureFields(prev => prev.map(field => 
+      field.id === id ? { ...field, x, y } : field
     ));
   };
 
-  const handleRemoveSignature = (id: string) => {
-    setSignatures(prev => prev.filter(sig => sig.id !== id));
+  const handleFieldRemove = (id: string) => {
+    setSignatureFields(prev => prev.filter(field => field.id !== id));
   };
 
-  const handleProceedToReview = () => {
-    if (signatures.length === 0) {
+  // Step 4: Generate Signed PDF
+  const handleSign = async () => {
+    if (!selectedFile || signatureFields.length === 0 || !signatureDetails) {
       toast({
-        title: 'No signatures',
-        description: 'Please add at least one signature before proceeding',
+        title: 'Missing requirements',
+        description: 'Please add at least one signature field',
         variant: 'destructive',
       });
       return;
     }
-
-    if (!signerInfo.name.trim()) {
-      toast({
-        title: 'Missing information',
-        description: 'Please enter your name',
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    setCurrentStep('review');
-  };
-
-  // Step 3: Generate Signed PDF
-  const handleGenerateSignedPDF = async () => {
-    if (!selectedFile || signatures.length === 0) return;
 
     setIsProcessing(true);
-    setProgress(0);
 
     try {
-      // Progress updates
-      const progressTimer = setInterval(() => {
-        setProgress(prev => {
-          if (prev >= 90) {
-            clearInterval(progressTimer);
-            return 90;
-          }
-          return prev + 15;
-        });
-      }, 300);
-
-      // Process the PDF
       const fileBuffer = await selectedFile.arrayBuffer();
-      const signaturePositions = signatures.map(sig => ({
-        x: sig.x,
-        y: sig.y,
-        signatureData: sig.signature,
-        pageNumber: sig.pageNumber,
-        width: 200,
-        height: 80
+      const signaturePositions = signatureFields.map(field => ({
+        x: field.x,
+        y: field.y,
+        signatureData: field.value || signatureDetails.signatureData || signatureDetails.fullName,
+        pageNumber: field.pageNumber,
+        width: field.width,
+        height: field.height,
+        fieldType: field.type
       }));
 
-      console.log('Processing signatures:', signaturePositions);
-      
       const signedPdfBytes = await PDFProcessor.addSignaturesToPDF(fileBuffer, signaturePositions);
       const signedBlob = new Blob([signedPdfBytes], { type: 'application/pdf' });
       
       setSignedPdfBlob(signedBlob);
-      clearInterval(progressTimer);
-      setProgress(100);
+      setCurrentStep('complete');
       
-      setTimeout(() => {
-        setIsProcessing(false);
-        setCurrentStep('complete');
-        toast({
-          title: 'PDF signed successfully!',
-          description: 'Your document is ready for download',
-        });
-      }, 500);
+      toast({
+        title: 'PDF signed successfully!',
+        description: 'Your document is ready for download',
+      });
 
     } catch (error) {
-      console.error('Error generating signed PDF:', error);
-      setIsProcessing(false);
+      console.error('Error signing PDF:', error);
       toast({
         title: 'Signing failed',
         description: 'Failed to generate signed PDF. Please try again.',
         variant: 'destructive',
       });
+    } finally {
+      setIsProcessing(false);
     }
   };
 
@@ -214,294 +283,157 @@ const SignPDF = ({ onBack }: SignPDFProps) => {
   const resetWorkflow = () => {
     setCurrentStep('upload');
     setSelectedFile(null);
-    setSignerInfo({ name: '', email: '' });
-    setSignatures([]);
-    setCurrentSignature(null);
+    setSignatureFields([]);
+    setSignatureDetails(null);
     setSignedPdfBlob(null);
-    setProgress(0);
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 bg-white min-h-screen">
+    <div className="h-screen flex flex-col bg-gray-50">
       {/* Header */}
-      <div className="mb-8">
-        <Button variant="outline" onClick={onBack} className="mb-4">
-          <ArrowLeft className="h-4 w-4 mr-2" />
-          Back to Tools
-        </Button>
-        
-        <h1 className="text-3xl font-bold text-gray-900">Sign PDF Document</h1>
-        <p className="text-gray-600 mt-2">Upload, sign, and download your PDF documents</p>
-      </div>
-
-      {/* Step Indicator */}
-      <div className="mb-8">
-        <div className="flex items-center justify-center space-x-4">
-          {['upload', 'sign', 'review', 'complete'].map((step, index) => (
-            <div key={step} className="flex items-center">
-              <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-medium ${
-                ['upload', 'sign', 'review', 'complete'].indexOf(currentStep) >= index 
-                  ? 'bg-blue-500 text-white' 
-                  : 'bg-gray-200 text-gray-600'
-              }`}>
-                {index + 1}
-              </div>
-              {index < 3 && (
-                <div className={`w-16 h-1 mx-2 ${
-                  ['upload', 'sign', 'review', 'complete'].indexOf(currentStep) > index 
-                    ? 'bg-blue-500' 
-                    : 'bg-gray-200'
-                }`} />
-              )}
-            </div>
-          ))}
-        </div>
-        <div className="flex justify-center space-x-20 mt-2 text-sm text-gray-600">
-          <span>Upload</span>
-          <span>Sign</span>
-          <span>Review</span>
-          <span>Complete</span>
+      <div className="bg-white border-b px-6 py-4 flex items-center justify-between">
+        <div className="flex items-center space-x-4">
+          <Button variant="outline" onClick={onBack}>
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back
+          </Button>
+          <h1 className="text-xl font-semibold">Sign PDF</h1>
+          {selectedFile && (
+            <span className="text-sm text-gray-600">• {selectedFile.name}</span>
+          )}
         </div>
       </div>
 
-      {/* Step Content */}
-      {currentStep === 'upload' && (
-        <Card className="max-w-2xl mx-auto">
-          <CardHeader>
-            <CardTitle className="flex items-center space-x-2">
-              <Upload className="h-6 w-6 text-blue-500" />
-              <span>Upload PDF Document</span>
-            </CardTitle>
-            <CardDescription>
-              Choose a PDF file to add your digital signature
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="border-2 border-dashed border-gray-300 rounded-lg p-12 text-center hover:border-blue-400 transition-colors">
-              <FileText className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-xl font-medium text-gray-900 mb-2">
-                Select PDF to Sign
-              </h3>
-              <p className="text-gray-500 mb-6">
-                Choose a PDF file from your computer (max 25MB)
-              </p>
-              <input
-                type="file"
-                accept=".pdf"
-                onChange={handleFileUpload}
-                className="hidden"
-                id="pdf-upload"
-              />
-              <label htmlFor="pdf-upload">
-                <Button asChild className="cursor-pointer bg-blue-500 hover:bg-blue-600">
-                  <span>
-                    <Upload className="h-4 w-4 mr-2" />
-                    Choose PDF File
-                  </span>
-                </Button>
-              </label>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {currentStep === 'sign' && selectedFile && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Signature Panel */}
-          <div className="lg:col-span-1 space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <PenTool className="h-5 w-5 text-blue-500" />
-                  <span>Create Signature</span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <SignatureCanvas onSignatureChange={setCurrentSignature} />
-                {currentSignature && (
-                  <Button
-                    onClick={handleAddSignature}
-                    className="w-full mt-4 bg-blue-500 hover:bg-blue-600"
-                  >
-                    Place on Document
-                  </Button>
-                )}
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Signer Information</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Full Name *
-                  </label>
-                  <Input
-                    placeholder="Enter your full name"
-                    value={signerInfo.name}
-                    onChange={(e) => setSignerInfo(prev => ({ ...prev, name: e.target.value }))}
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Email (optional)
-                  </label>
-                  <Input
-                    type="email"
-                    placeholder="Enter your email"
-                    value={signerInfo.email}
-                    onChange={(e) => setSignerInfo(prev => ({ ...prev, email: e.target.value }))}
-                  />
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Signatures ({signatures.length})</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {signatures.length === 0 ? (
-                  <p className="text-gray-500 text-center py-4">
-                    No signatures added yet
-                  </p>
-                ) : (
-                  <div className="space-y-2">
-                    {signatures.map((sig, index) => (
-                      <div key={sig.id} className="flex items-center justify-between p-2 bg-gray-50 rounded">
-                        <span className="text-sm">Signature {index + 1}</span>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleRemoveSignature(sig.id)}
-                        >
-                          Remove
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-                <Button
-                  onClick={handleProceedToReview}
-                  className="w-full mt-4 bg-green-500 hover:bg-green-600"
-                  disabled={signatures.length === 0}
-                >
-                  Continue to Review
-                </Button>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* PDF Viewer */}
-          <div className="lg:col-span-2">
-            <PDFViewer
-              file={selectedFile}
-              signatures={signatures}
-              onSignaturePositionChange={handleSignaturePositionChange}
-              onSignatureRemove={handleRemoveSignature}
-            />
-          </div>
-        </div>
-      )}
-
-      {currentStep === 'review' && (
-        <Card className="max-w-4xl mx-auto">
-          <CardHeader>
-            <CardTitle>Review & Sign Document</CardTitle>
-            <CardDescription>
-              Review your document and generate the final signed PDF
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="p-4 bg-blue-50 rounded-lg">
-                <h4 className="font-medium text-gray-800 mb-2">Document</h4>
-                <p className="text-sm text-gray-600">Name: {selectedFile?.name}</p>
-                <p className="text-sm text-gray-600">
-                  Size: {selectedFile ? (selectedFile.size / 1024 / 1024).toFixed(2) : 0} MB
-                </p>
+      {/* Content */}
+      <div className="flex-1 flex">
+        {/* Upload Step */}
+        {currentStep === 'upload' && (
+          <div className="flex-1 flex items-center justify-center">
+            <div className="max-w-md w-full mx-4">
+              <div className="text-center mb-8">
+                <FileText className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+                <h2 className="text-2xl font-semibold mb-2">Select PDF to Sign</h2>
+                <p className="text-gray-600">Choose a PDF file to add your digital signature</p>
               </div>
               
-              <div className="p-4 bg-green-50 rounded-lg">
-                <h4 className="font-medium text-gray-800 mb-2">Signature Details</h4>
-                <p className="text-sm text-gray-600">Signer: {signerInfo.name}</p>
-                <p className="text-sm text-gray-600">Signatures: {signatures.length}</p>
-                <p className="text-sm text-gray-600">Date: {new Date().toLocaleDateString()}</p>
+              <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-blue-400 transition-colors">
+                <input
+                  type="file"
+                  accept=".pdf"
+                  onChange={handleFileUpload}
+                  className="hidden"
+                  id="pdf-upload"
+                />
+                <label htmlFor="pdf-upload">
+                  <Button asChild className="cursor-pointer bg-blue-500 hover:bg-blue-600">
+                    <span>
+                      <Upload className="h-4 w-4 mr-2" />
+                      Choose PDF File
+                    </span>
+                  </Button>
+                </label>
+                <p className="text-sm text-gray-500 mt-2">Maximum file size: 25MB</p>
               </div>
             </div>
+          </div>
+        )}
 
-            {isProcessing && (
+        {/* Editor Step */}
+        {currentStep === 'editor' && selectedFile && (
+          <>
+            <div className="flex-1 bg-white">
+              <PDFViewer
+                file={selectedFile}
+                signatures={signatureFields.map(field => ({
+                  id: field.id,
+                  signature: field.value || '',
+                  x: field.x,
+                  y: field.y,
+                  pageNumber: field.pageNumber
+                }))}
+                onSignaturePositionChange={handleFieldPositionChange}
+                onSignatureRemove={handleFieldRemove}
+              />
+              
+              {/* Overlay signature fields */}
+              {signatureFields.map((field) => (
+                <DraggableField
+                  key={field.id}
+                  id={field.id}
+                  type={field.type}
+                  label={field.label}
+                  initialX={field.x}
+                  initialY={field.y}
+                  width={field.width}
+                  height={field.height}
+                  onPositionChange={handleFieldPositionChange}
+                  onRemove={handleFieldRemove}
+                  value={field.value}
+                />
+              ))}
+            </div>
+            
+            <SignatureFieldSidebar
+              onAddField={handleAddField}
+              requiredFields={requiredFields}
+              optionalFields={optionalFields}
+            />
+          </>
+        )}
+
+        {/* Complete Step */}
+        {currentStep === 'complete' && (
+          <div className="flex-1 flex items-center justify-center">
+            <div className="text-center">
+              <CheckCircle className="h-16 w-16 text-green-500 mx-auto mb-4" />
+              <h2 className="text-2xl font-semibold mb-4">Document Signed Successfully!</h2>
+              <p className="text-gray-600 mb-8">Your PDF has been digitally signed and is ready for download</p>
+              
               <div className="space-y-4">
-                <Progress value={progress} className="w-full h-3" />
-                <p className="text-center text-sm text-gray-600">
-                  Processing document... {progress}%
-                </p>
-              </div>
-            )}
-
-            {!isProcessing && (
-              <div className="text-center">
                 <Button
-                  onClick={handleGenerateSignedPDF}
-                  className="bg-green-500 hover:bg-green-600 px-8 py-3"
+                  onClick={handleDownloadSigned}
+                  className="bg-blue-500 hover:bg-blue-600 px-8"
                   size="lg"
                 >
-                  <Send className="h-4 w-4 mr-2" />
-                  Generate Signed PDF
+                  <Download className="h-4 w-4 mr-2" />
+                  Download Signed PDF
                 </Button>
+                
+                <div>
+                  <Button onClick={resetWorkflow} variant="outline">
+                    Sign Another Document
+                  </Button>
+                </div>
               </div>
-            )}
-          </CardContent>
-        </Card>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Modals */}
+      {currentStep === 'mode-selection' && selectedFile && (
+        <SigningModeSelector
+          onSelectMode={handleModeSelection}
+          documentName={selectedFile.name}
+        />
       )}
 
-      {currentStep === 'complete' && (
-        <Card className="max-w-2xl mx-auto">
-          <CardHeader>
-            <CardTitle className="text-center flex items-center justify-center space-x-2">
-              <CheckCircle className="h-8 w-8 text-green-500" />
-              <span className="text-green-800">Document Signed Successfully!</span>
-            </CardTitle>
-            <CardDescription className="text-center">
-              Your PDF has been digitally signed and is ready for download
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <div className="p-8 bg-green-50 rounded-lg text-center">
-              <FileText className="h-20 w-20 text-green-500 mx-auto mb-4" />
-              <h3 className="font-medium text-green-800 text-xl mb-2">
-                {selectedFile?.name}
-              </h3>
-              <p className="text-sm text-green-600 mb-4">
-                Signed by {signerInfo.name} on {new Date().toLocaleDateString()}
-              </p>
-              <p className="text-sm text-green-600">
-                Contains {signatures.length} digital signature{signatures.length !== 1 ? 's' : ''}
-              </p>
-            </div>
+      {showSignatureModal && (
+        <SignatureDetailsModal
+          onClose={() => setShowSignatureModal(false)}
+          onSave={handleSignatureDetailsSave}
+          initialDetails={signatureDetails || undefined}
+        />
+      )}
 
-            <div className="space-y-4">
-              <Button
-                onClick={handleDownloadSigned}
-                className="w-full bg-blue-500 hover:bg-blue-600"
-                size="lg"
-              >
-                <Download className="h-4 w-4 mr-2" />
-                Download Signed PDF
-              </Button>
-
-              <Button
-                onClick={resetWorkflow}
-                variant="outline"
-                className="w-full"
-              >
-                Sign Another Document
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+      {/* Processing Overlay */}
+      {isProcessing && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-8 text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto mb-4"></div>
+            <p>Processing your signed PDF...</p>
+          </div>
+        </div>
       )}
     </div>
   );
