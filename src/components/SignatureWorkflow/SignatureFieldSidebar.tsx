@@ -2,7 +2,7 @@
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { PenTool, Type, Calendar, FileText, Building, Plus } from 'lucide-react';
+import { PenTool, Plus } from 'lucide-react';
 
 interface SignatureField {
   id: string;
@@ -17,13 +17,15 @@ interface SignatureFieldSidebarProps {
   requiredFields: SignatureField[];
   optionalFields: SignatureField[];
   onSign: () => void;
+  isProcessing?: boolean;
 }
 
 const SignatureFieldSidebar: React.FC<SignatureFieldSidebarProps> = ({
   onAddField,
   requiredFields,
   optionalFields,
-  onSign
+  onSign,
+  isProcessing = false
 }) => {
   const renderField = (field: SignatureField, index: number) => (
     <div key={field.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
@@ -101,8 +103,9 @@ const SignatureFieldSidebar: React.FC<SignatureFieldSidebarProps> = ({
         <Button 
           onClick={onSign}
           className="w-full bg-red-500 hover:bg-red-600 text-white h-12 text-lg"
+          disabled={isProcessing}
         >
-          Sign →
+          {isProcessing ? 'Processing...' : 'Sign →'}
         </Button>
       </div>
     </div>
