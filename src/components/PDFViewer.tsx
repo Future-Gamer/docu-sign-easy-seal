@@ -2,7 +2,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { ZoomIn, ZoomOut, RotateCw, Download } from 'lucide-react';
+import { ZoomIn, ZoomOut, Download, ChevronLeft, ChevronRight } from 'lucide-react';
 import DraggableSignature from './DraggableSignature';
 
 interface PDFViewerProps {
@@ -24,23 +24,34 @@ const PDFViewer: React.FC<PDFViewerProps> = ({
   const [scale, setScale] = useState(1);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [isLoading, setIsLoading] = useState(true);
   const viewerRef = useRef<HTMLDivElement>(null);
+  const iframeRef = useRef<HTMLIFrameElement>(null);
 
   useEffect(() => {
     if (file) {
       const url = URL.createObjectURL(file);
       setPdfUrl(url);
+      setIsLoading(false);
       
       return () => URL.revokeObjectURL(url);
     }
   }, [file]);
 
   const handleZoomIn = () => {
-    setScale(prev => Math.min(prev + 0.25, 3));
+    setScale(prev => Math.min(prev + 0.25, 2));
   };
 
   const handleZoomOut = () => {
     setScale(prev => Math.max(prev - 0.25, 0.5));
+  };
+
+  const handleNextPage = () => {
+    setCurrentPage(prev => Math.min(prev + 1, totalPages));
+  };
+
+  const handlePrevPage = () => {
+    setCurrentPage(prev => Math.max(prev - 1, 1));
   };
 
   const handleDownload = () => {
@@ -52,50 +63,78 @@ const PDFViewer: React.FC<PDFViewerProps> = ({
     }
   };
 
+  if (isLoading) {
+    return (
+      <Card className={`bg-white border-gray-200 ${className}`}>
+        <CardContent className="p-8 text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto mb-4"></div>
+          <p className="text-gray-500">Loading PDF...</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
     <Card className={`bg-white border-gray-200 ${className}`}>
       <CardContent className="p-4">
         {/* PDF Controls */}
-        <div className="flex items-center justify-between mb-4 p-2 bg-gray-50 rounded-lg">
-          <div className="flex items-center space-x-2">
+        <div className="flex items-center justify-between mb-4 p-3 bg-gray-50 rounded-lg border">
+          <div className="flex items-center space-x-3">
             <Button variant="outline" size="sm" onClick={handleZoomOut}>
               <ZoomOut className="h-4 w-4" />
             </Button>
-            <span className="text-sm font-medium">{Math.round(scale * 100)}%</span>
+            <span className="text-sm font-medium px-2">{Math.round(scale * 100)}%</span>
             <Button variant="outline" size="sm" onClick={handleZoomIn}>
               <ZoomIn className="h-4 w-4" />
             </Button>
           </div>
-          <div className="flex items-center space-x-2">
-            <span className="text-sm text-gray-600">
+          
+          <div className="flex items-center space-x-3">
+            <Button variant="outline" size="sm" onClick={handlePrevPage} disabled={currentPage === 1}>
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <span className="text-sm text-gray-600 px-2">
               Page {currentPage} of {totalPages}
             </span>
-            <Button variant="outline" size="sm" onClick={handleDownload}>
-              <Download className="h-4 w-4" />
+            <Button variant="outline" size="sm" onClick={handleNextPage} disabled={currentPage >= totalPages}>
+              <ChevronRight className="h-4 w-4" />
             </Button>
           </div>
+
+          <Button variant="outline" size="sm" onClick={handleDownload}>
+            <Download className="h-4 w-4" />
+          </Button>
         </div>
 
         {/* PDF Viewer Container */}
         <div 
           ref={viewerRef}
-          className="relative w-full bg-gray-100 rounded-lg overflow-auto border border-gray-200"
-          style={{ height: '600px' }}
+          className="relative w-full bg-gray-100 rounded-lg overflow-hidden border border-gray-200"
+          style={{ height: '700px' }}
         >
           {pdfUrl && (
-            <div className="relative" style={{ transform: `scale(${scale})`, transformOrigin: 'top left' }}>
+            <div 
+              className="relative w-full h-full" 
+              style={{ 
+                transform: `scale(${scale})`, 
+                transformOrigin: 'top left',
+                width: `${100 / scale}%`,
+                height: `${100 / scale}%`
+              }}
+            >
               <iframe
-                src={`${pdfUrl}#page=${currentPage}&toolbar=0&navpanes=0&scrollbar=0`}
+                ref={iframeRef}
+                src={`${pdfUrl}#page=${currentPage}&toolbar=0&navpanes=0&scrollbar=0&view=FitH`}
                 className="w-full h-full border-0"
-                style={{ minHeight: '800px', width: '100%' }}
                 title="PDF Preview"
-                onLoad={(e) => {
-                  // Try to get total pages (this is limited in iframe)
-                  console.log('PDF loaded in viewer');
+                onLoad={() => {
+                  console.log('PDF loaded successfully');
+                  // Estimate total pages (this is a limitation of iframe approach)
+                  setTotalPages(5); // Default estimate
                 }}
               />
               
-              {/* Signature Overlays */}
+              {/* Signature Overlays for current page */}
               {signatures
                 .filter(sig => sig.pageNumber === currentPage)
                 .map((sig) => (
@@ -107,34 +146,13 @@ const PDFViewer: React.FC<PDFViewerProps> = ({
                     onPositionChange={(x, y) => onSignaturePositionChange(sig.id, x, y)}
                     onRemove={() => onSignatureRemove(sig.id)}
                     containerWidth={viewerRef.current?.clientWidth || 800}
-                    containerHeight={600}
+                    containerHeight={700}
+                    scale={scale}
                   />
                 ))}
             </div>
           )}
         </div>
-
-        {/* Page Navigation */}
-        {totalPages > 1 && (
-          <div className="flex items-center justify-center space-x-2 mt-4">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-              disabled={currentPage === 1}
-            >
-              Previous
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-              disabled={currentPage === totalPages}
-            >
-              Next
-            </Button>
-          </div>
-        )}
       </CardContent>
     </Card>
   );
