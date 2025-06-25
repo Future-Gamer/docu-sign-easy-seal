@@ -7,6 +7,7 @@ import PDFViewer from '../PDFViewer';
 import SignatureDetailsModal, { SignatureDetails } from './SignatureDetailsModal';
 import SignatureFieldSidebar from './SignatureFieldSidebar';
 import DraggableField from './DraggableField';
+import CompanyStampUploadModal from './CompanyStampUploadModal';
 
 interface SignatureField {
   id: string;
@@ -32,8 +33,10 @@ const SignatureEditorStep: React.FC<SignatureEditorStepProps> = ({
   signingMode,
   onComplete
 }) => {
-  const [showSignatureModal, setShowSignatureModal] = useState(true);
+  const [showSignatureModal, setShowSignatureModal] = useState(false);
+  const [showCompanyStampModal, setShowCompanyStampModal] = useState(false);
   const [signatureDetails, setSignatureDetails] = useState<SignatureDetails | null>(null);
+  const [companyStampImage, setCompanyStampImage] = useState<string | null>(null);
   const [signatureFields, setSignatureFields] = useState<SignatureField[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const { toast } = useToast();
@@ -97,11 +100,28 @@ const SignatureEditorStep: React.FC<SignatureEditorStepProps> = ({
     });
   };
 
+  const handleCompanyStampUpload = (stampImage: string) => {
+    setCompanyStampImage(stampImage);
+    setShowCompanyStampModal(false);
+    
+    toast({
+      title: 'Company stamp uploaded',
+      description: 'You can now add company stamp fields to the document',
+    });
+  };
+
   const handleAddField = (fieldType: string) => {
     console.log('Adding field:', fieldType);
     
-    if (!signatureDetails && fieldType === 'signature') {
+    // Show signature modal if signature field is added and details not set
+    if (fieldType === 'signature' && !signatureDetails) {
       setShowSignatureModal(true);
+      return;
+    }
+
+    // Show company stamp modal if company stamp field is added and no stamp uploaded
+    if (fieldType === 'company_stamp' && !companyStampImage) {
+      setShowCompanyStampModal(true);
       return;
     }
 
@@ -109,10 +129,10 @@ const SignatureEditorStep: React.FC<SignatureEditorStepProps> = ({
       id: `${fieldType}_${Date.now()}`,
       type: fieldType as any,
       label: fieldType.charAt(0).toUpperCase() + fieldType.slice(1),
-      x: 50, // Start in center
-      y: 50, // Start in center
-      width: fieldType === 'signature' ? 200 : fieldType === 'initials' ? 100 : 150,
-      height: fieldType === 'signature' ? 80 : 50,
+      x: 50,
+      y: 50,
+      width: getFieldWidth(fieldType),
+      height: getFieldHeight(fieldType),
       pageNumber: 1,
       value: getFieldValue(fieldType),
       isRequired: fieldType === 'signature'
@@ -126,18 +146,40 @@ const SignatureEditorStep: React.FC<SignatureEditorStepProps> = ({
     });
   };
 
+  const getFieldWidth = (fieldType: string): number => {
+    switch (fieldType) {
+      case 'signature': return 200;
+      case 'initials': return 100;
+      case 'company_stamp': return 150;
+      case 'date': return 120;
+      case 'text': return 150;
+      case 'name': return 180;
+      default: return 150;
+    }
+  };
+
+  const getFieldHeight = (fieldType: string): number => {
+    switch (fieldType) {
+      case 'signature': return 80;
+      case 'company_stamp': return 80;
+      default: return 50;
+    }
+  };
+
   const getFieldValue = (fieldType: string): string => {
-    if (!signatureDetails) return '';
-    
     switch (fieldType) {
       case 'signature':
-        return signatureDetails.signatureData || signatureDetails.fullName;
+        return signatureDetails?.signatureData || signatureDetails?.fullName || '';
       case 'initials':
-        return signatureDetails.initials;
+        return signatureDetails?.initials || '';
       case 'name':
-        return signatureDetails.fullName;
+        return signatureDetails?.fullName || '';
       case 'date':
         return new Date().toLocaleDateString();
+      case 'text':
+        return 'Custom Text';
+      case 'company_stamp':
+        return companyStampImage || '';
       default:
         return '';
     }
@@ -156,8 +198,22 @@ const SignatureEditorStep: React.FC<SignatureEditorStepProps> = ({
     
     toast({
       title: 'Field removed',
-      description: 'Signature field has been removed from the document',
+      description: 'Field has been removed from the document',
     });
+  };
+
+  const handleFieldEdit = (id: string) => {
+    const field = signatureFields.find(f => f.id === id);
+    if (!field) return;
+
+    if (field.type === 'text') {
+      const newText = prompt('Enter custom text:', field.value || '');
+      if (newText !== null) {
+        setSignatureFields(prev => prev.map(f => 
+          f.id === id ? { ...f, value: newText } : f
+        ));
+      }
+    }
   };
 
   const handleSign = async () => {
@@ -170,16 +226,6 @@ const SignatureEditorStep: React.FC<SignatureEditorStepProps> = ({
       return;
     }
 
-    if (!signatureDetails) {
-      toast({
-        title: 'Missing signature details',
-        description: 'Please provide your signature details',
-        variant: 'destructive',
-      });
-      setShowSignatureModal(true);
-      return;
-    }
-
     setIsProcessing(true);
 
     try {
@@ -188,7 +234,7 @@ const SignatureEditorStep: React.FC<SignatureEditorStepProps> = ({
       const signaturePositions = signatureFields.map(field => ({
         x: field.x,
         y: field.y,
-        signatureData: field.value || signatureDetails.signatureData || signatureDetails.fullName,
+        signatureData: field.value || '',
         pageNumber: field.pageNumber,
         width: field.width,
         height: field.height,
@@ -225,15 +271,9 @@ const SignatureEditorStep: React.FC<SignatureEditorStepProps> = ({
       <div className="flex-1 bg-white relative overflow-hidden">
         <PDFViewer
           file={file}
-          signatures={signatureFields.map(field => ({
-            id: field.id,
-            signature: field.value || '',
-            x: field.x,
-            y: field.y,
-            pageNumber: field.pageNumber
-          }))}
-          onSignaturePositionChange={handleFieldPositionChange}
-          onSignatureRemove={handleFieldRemove}
+          signatures={[]}
+          onSignaturePositionChange={() => {}}
+          onSignatureRemove={() => {}}
         />
         
         {/* Draggable Fields Overlay */}
@@ -250,6 +290,7 @@ const SignatureEditorStep: React.FC<SignatureEditorStepProps> = ({
                 height={field.height}
                 onPositionChange={handleFieldPositionChange}
                 onRemove={handleFieldRemove}
+                onEdit={handleFieldEdit}
                 value={field.value}
               />
             </div>
@@ -271,6 +312,13 @@ const SignatureEditorStep: React.FC<SignatureEditorStepProps> = ({
           onClose={() => setShowSignatureModal(false)}
           onSave={handleSignatureDetailsSave}
           initialDetails={signatureDetails || undefined}
+        />
+      )}
+
+      {showCompanyStampModal && (
+        <CompanyStampUploadModal
+          onClose={() => setShowCompanyStampModal(false)}
+          onSave={handleCompanyStampUpload}
         />
       )}
 

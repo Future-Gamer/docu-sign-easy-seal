@@ -83,19 +83,37 @@ const DraggableField: React.FC<DraggableFieldProps> = ({
   const getFieldContent = () => {
     switch (type) {
       case 'signature':
-        return value || 'Signature';
+        if (value && value.startsWith('data:image')) {
+          return (
+            <img 
+              src={value} 
+              alt="Signature" 
+              className="max-w-full max-h-full object-contain"
+            />
+          );
+        }
+        return <span className="text-lg font-script">Signature</span>;
       case 'initials':
-        return value || 'AB';
+        return <span className="text-base font-bold">{value || 'AB'}</span>;
       case 'name':
-        return value || 'Name';
+        return <span className="text-sm font-medium">{value || 'Full Name'}</span>;
       case 'date':
-        return value || new Date().toLocaleDateString();
+        return <span className="text-sm">{value || new Date().toLocaleDateString()}</span>;
       case 'text':
-        return value || 'Text';
+        return <span className="text-sm">{value || 'Custom Text'}</span>;
       case 'company_stamp':
-        return value || 'Company Stamp';
+        if (value && value.startsWith('data:image')) {
+          return (
+            <img 
+              src={value} 
+              alt="Company Stamp" 
+              className="max-w-full max-h-full object-contain"
+            />
+          );
+        }
+        return <span className="text-xs">Company Stamp</span>;
       default:
-        return label;
+        return <span className="text-sm">{label}</span>;
     }
   };
 
@@ -149,7 +167,7 @@ const DraggableField: React.FC<DraggableFieldProps> = ({
             <X className="h-3 w-3" />
           </Button>
           
-          {onEdit && (
+          {onEdit && type === 'text' && (
             <Button
               variant="secondary"
               size="sm"
@@ -163,7 +181,7 @@ const DraggableField: React.FC<DraggableFieldProps> = ({
             </Button>
           )}
 
-          <div className="text-center text-sm font-medium text-gray-700">
+          <div className="text-center overflow-hidden">
             {getFieldContent()}
           </div>
           

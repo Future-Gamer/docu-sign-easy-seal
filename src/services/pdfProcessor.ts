@@ -34,13 +34,18 @@ export class PDFProcessor {
           const y = pageHeight - (signature.y / 100) * pageHeight - signatureHeight;
 
           // Handle different field types
-          if (signature.signatureData.startsWith('data:image')) {
+          if (signature.signatureData && signature.signatureData.startsWith('data:image')) {
             try {
-              // Handle image signatures
+              // Handle image signatures and company stamps
               const base64Data = signature.signatureData.split(',')[1];
               const imageBytes = Uint8Array.from(atob(base64Data), c => c.charCodeAt(0));
               
-              const signatureImage = await pdfDoc.embedPng(imageBytes);
+              let signatureImage;
+              if (signature.signatureData.includes('image/png')) {
+                signatureImage = await pdfDoc.embedPng(imageBytes);
+              } else {
+                signatureImage = await pdfDoc.embedJpg(imageBytes);
+              }
               
               page.drawImage(signatureImage, {
                 x: Math.max(0, x),
@@ -51,7 +56,7 @@ export class PDFProcessor {
               });
 
             } catch (imageError) {
-              console.error('Error embedding signature image:', imageError);
+              console.error('Error embedding image:', imageError);
               // Fallback to text
               await this.drawTextField(pdfDoc, page, signature.signatureData, x, y, signature.fieldType);
             }
@@ -82,9 +87,8 @@ export class PDFProcessor {
     fieldType?: string
   ) {
     try {
-      const font = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
       let fontSize = 14;
-      let fontStyle = StandardFonts.HelveticaBold;
+      let fontStyle = StandardFonts.Helvetica;
 
       // Adjust font based on field type
       switch (fieldType) {
@@ -94,6 +98,7 @@ export class PDFProcessor {
           break;
         case 'initials':
           fontSize = 16;
+          fontStyle = StandardFonts.HelveticaBold;
           break;
         case 'name':
           fontSize = 12;
@@ -107,15 +112,25 @@ export class PDFProcessor {
           fontSize = 10;
           fontStyle = StandardFonts.Helvetica;
           break;
+        case 'company_stamp':
+          fontSize = 8;
+          fontStyle = StandardFonts.HelveticaBold;
+          break;
         default:
           fontSize = 14;
       }
 
       const finalFont = await pdfDoc.embedFont(fontStyle);
       
-      page.drawText(text || '[SIGNED]', {
-        x: Math.max(0, x),
-        y: Math.max(0, y),
+      // Clean text - remove any code or data URLs
+      let cleanText = text;
+      if (text.startsWith('data:')) {
+        cleanText = '[IMAGE]';
+      }
+      
+      page.drawText(cleanText || '[SIGNED]', {
+        x: Math.max(0, x + 5), // Small padding
+        y: Math.max(0, y + (fontSize / 2)), // Center vertically
         size: fontSize,
         font: finalFont,
         color: rgb(0, 0, 0),
@@ -124,7 +139,7 @@ export class PDFProcessor {
       console.error('Error drawing text field:', error);
       // Fallback
       const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
-      page.drawText(text || '[SIGNED]', {
+      page.drawText('[SIGNED]', {
         x: Math.max(0, x),
         y: Math.max(0, y),
         size: 12,
