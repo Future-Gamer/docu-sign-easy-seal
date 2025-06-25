@@ -87,33 +87,20 @@ const SignatureEditorStep: React.FC<SignatureEditorStepProps> = ({
   ];
 
   const handleSignatureDetailsSave = (details: SignatureDetails) => {
+    console.log('Signature details saved:', details);
     setSignatureDetails(details);
     setShowSignatureModal(false);
     
-    // Auto-add signature field
-    const signatureField: SignatureField = {
-      id: `signature_${Date.now()}`,
-      type: 'signature',
-      label: 'Signature',
-      x: 20,
-      y: 70,
-      width: 200,
-      height: 80,
-      pageNumber: 1,
-      value: details.signatureData || details.fullName,
-      isRequired: true
-    };
-    
-    setSignatureFields([signatureField]);
-    
     toast({
-      title: 'Signature added',
-      description: 'Drag the signature to position it on the document',
+      title: 'Signature details saved',
+      description: 'You can now add signature fields to the document',
     });
   };
 
   const handleAddField = (fieldType: string) => {
-    if (!signatureDetails) {
+    console.log('Adding field:', fieldType);
+    
+    if (!signatureDetails && fieldType === 'signature') {
       setShowSignatureModal(true);
       return;
     }
@@ -122,8 +109,8 @@ const SignatureEditorStep: React.FC<SignatureEditorStepProps> = ({
       id: `${fieldType}_${Date.now()}`,
       type: fieldType as any,
       label: fieldType.charAt(0).toUpperCase() + fieldType.slice(1),
-      x: 20,
-      y: 20,
+      x: 50, // Start in center
+      y: 50, // Start in center
       width: fieldType === 'signature' ? 200 : fieldType === 'initials' ? 100 : 150,
       height: fieldType === 'signature' ? 80 : 50,
       pageNumber: 1,
@@ -132,6 +119,11 @@ const SignatureEditorStep: React.FC<SignatureEditorStepProps> = ({
     };
 
     setSignatureFields(prev => [...prev, newField]);
+    
+    toast({
+      title: 'Field added',
+      description: `${fieldType} field added. Drag it to position on the document.`,
+    });
   };
 
   const getFieldValue = (fieldType: string): string => {
@@ -152,17 +144,24 @@ const SignatureEditorStep: React.FC<SignatureEditorStepProps> = ({
   };
 
   const handleFieldPositionChange = (id: string, x: number, y: number) => {
+    console.log('Field position changed:', id, x, y);
     setSignatureFields(prev => prev.map(field => 
       field.id === id ? { ...field, x, y } : field
     ));
   };
 
   const handleFieldRemove = (id: string) => {
+    console.log('Removing field:', id);
     setSignatureFields(prev => prev.filter(field => field.id !== id));
+    
+    toast({
+      title: 'Field removed',
+      description: 'Signature field has been removed from the document',
+    });
   };
 
   const handleSign = async () => {
-    if (!file || signatureFields.length === 0 || !signatureDetails) {
+    if (!file || signatureFields.length === 0) {
       toast({
         title: 'Missing requirements',
         description: 'Please add at least one signature field',
@@ -171,9 +170,20 @@ const SignatureEditorStep: React.FC<SignatureEditorStepProps> = ({
       return;
     }
 
+    if (!signatureDetails) {
+      toast({
+        title: 'Missing signature details',
+        description: 'Please provide your signature details',
+        variant: 'destructive',
+      });
+      setShowSignatureModal(true);
+      return;
+    }
+
     setIsProcessing(true);
 
     try {
+      console.log('Starting PDF signing process...');
       const fileBuffer = await file.arrayBuffer();
       const signaturePositions = signatureFields.map(field => ({
         x: field.x,
@@ -185,9 +195,12 @@ const SignatureEditorStep: React.FC<SignatureEditorStepProps> = ({
         fieldType: field.type
       }));
 
+      console.log('Signature positions:', signaturePositions);
+
       const signedPdfBytes = await PDFProcessor.addSignaturesToPDF(fileBuffer, signaturePositions);
       const signedBlob = new Blob([signedPdfBytes], { type: 'application/pdf' });
       
+      console.log('PDF signed successfully');
       onComplete(signedBlob);
       
       toast({
@@ -208,8 +221,8 @@ const SignatureEditorStep: React.FC<SignatureEditorStepProps> = ({
   };
 
   return (
-    <>
-      <div className="flex-1 bg-white relative">
+    <div className="flex h-full">
+      <div className="flex-1 bg-white relative overflow-hidden">
         <PDFViewer
           file={file}
           signatures={signatureFields.map(field => ({
@@ -223,22 +236,25 @@ const SignatureEditorStep: React.FC<SignatureEditorStepProps> = ({
           onSignatureRemove={handleFieldRemove}
         />
         
-        {/* Overlay signature fields */}
-        {signatureFields.map((field) => (
-          <DraggableField
-            key={field.id}
-            id={field.id}
-            type={field.type}
-            label={field.label}
-            initialX={field.x}
-            initialY={field.y}
-            width={field.width}
-            height={field.height}
-            onPositionChange={handleFieldPositionChange}
-            onRemove={handleFieldRemove}
-            value={field.value}
-          />
-        ))}
+        {/* Draggable Fields Overlay */}
+        <div className="absolute inset-0 pointer-events-none">
+          {signatureFields.map((field) => (
+            <div key={field.id} className="pointer-events-auto">
+              <DraggableField
+                id={field.id}
+                type={field.type}
+                label={field.label}
+                initialX={field.x}
+                initialY={field.y}
+                width={field.width}
+                height={field.height}
+                onPositionChange={handleFieldPositionChange}
+                onRemove={handleFieldRemove}
+                value={field.value}
+              />
+            </div>
+          ))}
+        </div>
       </div>
       
       <SignatureFieldSidebar
@@ -267,7 +283,7 @@ const SignatureEditorStep: React.FC<SignatureEditorStepProps> = ({
           </div>
         </div>
       )}
-    </>
+    </div>
   );
 };
 
