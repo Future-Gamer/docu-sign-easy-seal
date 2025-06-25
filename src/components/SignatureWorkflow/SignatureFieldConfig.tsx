@@ -48,3 +48,8 @@ export const optionalFields = [
     isRequired: false
   }
 ];
+
+export const SignatureFieldConfig = {
+  requiredFields,
+  optionalFields
+};

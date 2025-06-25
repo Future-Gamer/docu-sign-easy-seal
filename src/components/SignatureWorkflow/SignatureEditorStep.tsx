@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import PDFViewer from '../PDFViewer';
@@ -5,7 +6,7 @@ import SignatureDetailsModal, { SignatureDetails } from './SignatureDetailsModal
 import SignatureFieldSidebar from './SignatureFieldSidebar';
 import DraggableField from './DraggableField';
 import CompanyStampUploadModal from './CompanyStampUploadModal';
-import { SignatureFieldManager } from './SignatureFieldManager';
+import { SignatureFieldManager, SignatureField } from './SignatureFieldManager';
 import { SignatureFieldConfig } from './SignatureFieldConfig';
 import { PDFSigningProcessor } from './PDFSigningProcessor';
 
@@ -147,7 +148,7 @@ const SignatureEditorStep: React.FC<SignatureEditorStepProps> = ({
             onSignatureRemove={() => {}}
           />
           
-          {/* Draggable Fields Overlay - Positioned absolutely over the PDF viewer */}
+          {/* Draggable Fields Overlay */}
           <div className="absolute inset-0 pointer-events-none z-10">
             <div className="relative w-full h-full">
               {signatureFields.map((field) => (
