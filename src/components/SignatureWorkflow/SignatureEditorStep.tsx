@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import PDFViewer from '../PDFViewer';
@@ -6,8 +5,8 @@ import SignatureDetailsModal, { SignatureDetails } from './SignatureDetailsModal
 import SignatureFieldSidebar from './SignatureFieldSidebar';
 import DraggableField from './DraggableField';
 import CompanyStampUploadModal from './CompanyStampUploadModal';
-import { SignatureField, SignatureFieldManager } from './SignatureFieldManager';
-import { requiredFields, optionalFields } from './SignatureFieldConfig';
+import { SignatureFieldManager } from './SignatureFieldManager';
+import { SignatureFieldConfig } from './SignatureFieldConfig';
 import { PDFSigningProcessor } from './PDFSigningProcessor';
 
 interface SignatureEditorStepProps {
@@ -137,44 +136,51 @@ const SignatureEditorStep: React.FC<SignatureEditorStepProps> = ({
   };
 
   return (
-    <div className="flex h-full w-full">
+    <div className="flex h-full w-full bg-gray-50">
       {/* Document Viewer - Takes maximum space */}
       <div className="flex-1 bg-white relative overflow-hidden min-w-0">
-        <PDFViewer
-          file={file}
-          signatures={[]}
-          onSignaturePositionChange={() => {}}
-          onSignatureRemove={() => {}}
-        />
-        
-        {/* Draggable Fields Overlay */}
-        <div className="absolute inset-0 pointer-events-none">
-          {signatureFields.map((field) => (
-            <div key={field.id} className="pointer-events-auto">
-              <DraggableField
-                id={field.id}
-                type={field.type}
-                label={field.label}
-                initialX={field.x}
-                initialY={field.y}
-                width={field.width}
-                height={field.height}
-                onPositionChange={handleFieldPositionChange}
-                onRemove={handleFieldRemove}
-                onEdit={handleFieldEdit}
-                value={field.value}
-              />
+        <div className="relative w-full h-full">
+          <PDFViewer
+            file={file}
+            signatures={[]}
+            onSignaturePositionChange={() => {}}
+            onSignatureRemove={() => {}}
+          />
+          
+          {/* Draggable Fields Overlay - Positioned absolutely over the PDF viewer */}
+          <div className="absolute inset-0 pointer-events-none z-10">
+            <div className="relative w-full h-full">
+              {signatureFields.map((field) => (
+                <div key={field.id} className="pointer-events-auto">
+                  <DraggableField
+                    id={field.id}
+                    type={field.type}
+                    label={field.label}
+                    initialX={field.x}
+                    initialY={field.y}
+                    width={field.width}
+                    height={field.height}
+                    onPositionChange={handleFieldPositionChange}
+                    onRemove={handleFieldRemove}
+                    onEdit={handleFieldEdit}
+                    value={field.value}
+                    containerWidth={800}
+                    containerHeight={600}
+                    scale={1}
+                  />
+                </div>
+              ))}
             </div>
-          ))}
+          </div>
         </div>
       </div>
       
-      {/* Sidebar - Fixed width, only takes necessary space */}
-      <div className="flex-shrink-0">
+      {/* Sidebar - Fixed width */}
+      <div className="flex-shrink-0 w-80 bg-white border-l border-gray-200">
         <SignatureFieldSidebar
           onAddField={handleAddField}
-          requiredFields={requiredFields}
-          optionalFields={optionalFields}
+          requiredFields={SignatureFieldConfig.requiredFields}
+          optionalFields={SignatureFieldConfig.optionalFields}
           onSign={handleSign}
           isProcessing={isProcessing}
         />

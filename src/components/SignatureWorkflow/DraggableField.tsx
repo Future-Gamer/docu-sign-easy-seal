@@ -1,5 +1,5 @@
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { X, Move, Edit3 } from 'lucide-react';
@@ -39,44 +39,77 @@ const DraggableField: React.FC<DraggableFieldProps> = ({
 }) => {
   const [position, setPosition] = useState({ x: initialX, y: initialY });
   const [isDragging, setIsDragging] = useState(false);
-  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const fieldRef = useRef<HTMLDivElement>(null);
+
+  // Add global mouse event listeners when dragging
+  useEffect(() => {
+    const handleGlobalMouseMove = (e: MouseEvent) => {
+      if (!isDragging || !fieldRef.current) return;
+
+      const container = fieldRef.current.offsetParent as HTMLElement;
+      if (!container) return;
+
+      const containerRect = container.getBoundingClientRect();
+      
+      // Calculate new position based on mouse position minus drag offset
+      const newX = ((e.clientX - containerRect.left - dragOffset.x) / containerRect.width) * 100;
+      const newY = ((e.clientY - containerRect.top - dragOffset.y) / containerRect.height) * 100;
+      
+      // Constrain to container bounds
+      const constrainedX = Math.max(0, Math.min(100 - (width / containerRect.width * 100), newX));
+      const constrainedY = Math.max(0, Math.min(100 - (height / containerRect.height * 100), newY));
+      
+      setPosition({ x: constrainedX, y: constrainedY });
+      onPositionChange(id, constrainedX, constrainedY);
+    };
+
+    const handleGlobalMouseUp = () => {
+      if (isDragging) {
+        setIsDragging(false);
+        document.body.style.cursor = 'default';
+        document.body.style.userSelect = 'auto';
+      }
+    };
+
+    if (isDragging) {
+      document.addEventListener('mousemove', handleGlobalMouseMove);
+      document.addEventListener('mouseup', handleGlobalMouseUp);
+      document.body.style.cursor = 'grabbing';
+      document.body.style.userSelect = 'none';
+    }
+
+    return () => {
+      document.removeEventListener('mousemove', handleGlobalMouseMove);
+      document.removeEventListener('mouseup', handleGlobalMouseUp);
+      document.body.style.cursor = 'default';
+      document.body.style.userSelect = 'auto';
+    };
+  }, [isDragging, dragOffset, width, height, onPositionChange, id]);
 
   const handleMouseDown = (e: React.MouseEvent) => {
     e.preventDefault();
-    setIsDragging(true);
+    e.stopPropagation();
     
-    const rect = fieldRef.current?.getBoundingClientRect();
-    if (rect) {
-      setDragStart({
+    if (!fieldRef.current) return;
+
+    const rect = fieldRef.current.getBoundingClientRect();
+    const container = fieldRef.current.offsetParent as HTMLElement;
+    
+    if (container) {
+      const containerRect = container.getBoundingClientRect();
+      
+      // Calculate offset from mouse position to top-left of element
+      setDragOffset({
         x: e.clientX - rect.left,
         y: e.clientY - rect.top
       });
     }
+    
+    setIsDragging(true);
   };
 
-  const handleMouseMove = (e: React.MouseEvent) => {
-    if (!isDragging || !fieldRef.current) return;
-
-    const container = fieldRef.current.offsetParent as HTMLElement;
-    if (!container) return;
-
-    const containerRect = container.getBoundingClientRect();
-    
-    const newX = ((e.clientX - containerRect.left - dragStart.x) / containerRect.width) * 100;
-    const newY = ((e.clientY - containerRect.top - dragStart.y) / containerRect.height) * 100;
-    
-    const constrainedX = Math.max(0, Math.min(100 - (width / containerRect.width * 100), newX));
-    const constrainedY = Math.max(0, Math.min(100 - (height / containerRect.height * 100), newY));
-    
-    setPosition({ x: constrainedX, y: constrainedY });
-    onPositionChange(id, constrainedX, constrainedY);
-  };
-
-  const handleMouseUp = () => {
-    setIsDragging(false);
-  };
-
+  // Convert percentage position to pixels
   const pixelX = (position.x / 100) * containerWidth;
   const pixelY = (position.y / 100) * containerHeight;
 
@@ -89,6 +122,7 @@ const DraggableField: React.FC<DraggableFieldProps> = ({
               src={value} 
               alt="Signature" 
               className="max-w-full max-h-full object-contain"
+              draggable={false}
             />
           );
         }
@@ -108,6 +142,7 @@ const DraggableField: React.FC<DraggableFieldProps> = ({
               src={value} 
               alt="Company Stamp" 
               className="max-w-full max-h-full object-contain"
+              draggable={false}
             />
           );
         }
@@ -139,7 +174,7 @@ const DraggableField: React.FC<DraggableFieldProps> = ({
   return (
     <div
       ref={fieldRef}
-      className="absolute cursor-move z-20"
+      className={`absolute z-20 select-none ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
       style={{
         left: `${pixelX}px`,
         top: `${pixelY}px`,
@@ -149,11 +184,8 @@ const DraggableField: React.FC<DraggableFieldProps> = ({
         transformOrigin: 'top left'
       }}
       onMouseDown={handleMouseDown}
-      onMouseMove={handleMouseMove}
-      onMouseUp={handleMouseUp}
-      onMouseLeave={handleMouseUp}
     >
-      <Card className={`border-2 ${getFieldColor()} shadow-lg h-full`}>
+      <Card className={`border-2 ${getFieldColor()} shadow-lg h-full ${isDragging ? 'shadow-2xl' : ''}`}>
         <CardContent className="p-2 relative h-full flex items-center justify-center">
           <Button
             variant="destructive"
@@ -181,11 +213,11 @@ const DraggableField: React.FC<DraggableFieldProps> = ({
             </Button>
           )}
 
-          <div className="text-center overflow-hidden">
+          <div className="text-center overflow-hidden pointer-events-none">
             {getFieldContent()}
           </div>
           
-          <div className="absolute bottom-1 right-1">
+          <div className="absolute bottom-1 right-1 pointer-events-none">
             <Move className="h-3 w-3 text-gray-400" />
           </div>
         </CardContent>
