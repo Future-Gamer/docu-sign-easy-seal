@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -10,6 +9,8 @@ interface PDFViewerProps {
   signatures: Array<{ id: string; signature: string; x: number; y: number; pageNumber: number }>;
   onSignaturePositionChange: (id: string, x: number, y: number) => void;
   onSignatureRemove: (id: string) => void;
+  onScaleChange?: (scale: number) => void;
+  onContainerDimensionsChange?: (dimensions: { width: number; height: number }) => void;
   className?: string;
 }
 
@@ -18,6 +19,8 @@ const PDFViewer: React.FC<PDFViewerProps> = ({
   signatures,
   onSignaturePositionChange,
   onSignatureRemove,
+  onScaleChange,
+  onContainerDimensionsChange,
   className = ''
 }) => {
   const [pdfUrl, setPdfUrl] = useState<string>('');
@@ -37,6 +40,35 @@ const PDFViewer: React.FC<PDFViewerProps> = ({
       return () => URL.revokeObjectURL(url);
     }
   }, [file]);
+
+  // Notify parent component of scale changes
+  useEffect(() => {
+    if (onScaleChange) {
+      onScaleChange(scale);
+    }
+  }, [scale, onScaleChange]);
+
+  // Notify parent component of container dimension changes
+  useEffect(() => {
+    const updateContainerDimensions = () => {
+      if (viewerRef.current && onContainerDimensionsChange) {
+        const rect = viewerRef.current.getBoundingClientRect();
+        onContainerDimensionsChange({
+          width: rect.width,
+          height: rect.height
+        });
+      }
+    };
+
+    updateContainerDimensions();
+    
+    // Listen for resize events
+    window.addEventListener('resize', updateContainerDimensions);
+    
+    return () => {
+      window.removeEventListener('resize', updateContainerDimensions);
+    };
+  }, [onContainerDimensionsChange]);
 
   const handleZoomIn = () => {
     setScale(prev => Math.min(prev + 0.25, 2));
@@ -129,7 +161,6 @@ const PDFViewer: React.FC<PDFViewerProps> = ({
                 title="PDF Preview"
                 onLoad={() => {
                   console.log('PDF loaded successfully');
-                  // Estimate total pages (this is a limitation of iframe approach)
                   setTotalPages(5); // Default estimate
                 }}
               />

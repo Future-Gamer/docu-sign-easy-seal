@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import PDFViewer from '../PDFViewer';
@@ -27,6 +26,8 @@ const SignatureEditorStep: React.FC<SignatureEditorStepProps> = ({
   const [companyStampImage, setCompanyStampImage] = useState<string | null>(null);
   const [signatureFields, setSignatureFields] = useState<SignatureField[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [pdfScale, setPdfScale] = useState(1);
+  const [pdfContainerDimensions, setPdfContainerDimensions] = useState({ width: 800, height: 600 });
   const { toast } = useToast();
 
   const handleSignatureDetailsSave = (details: SignatureDetails) => {
@@ -146,6 +147,8 @@ const SignatureEditorStep: React.FC<SignatureEditorStepProps> = ({
             signatures={[]}
             onSignaturePositionChange={() => {}}
             onSignatureRemove={() => {}}
+            onScaleChange={setPdfScale}
+            onContainerDimensionsChange={setPdfContainerDimensions}
           />
           
           {/* Draggable Fields Overlay */}
@@ -165,9 +168,9 @@ const SignatureEditorStep: React.FC<SignatureEditorStepProps> = ({
                     onRemove={handleFieldRemove}
                     onEdit={handleFieldEdit}
                     value={field.value}
-                    containerWidth={800}
-                    containerHeight={600}
-                    scale={1}
+                    containerWidth={pdfContainerDimensions.width}
+                    containerHeight={pdfContainerDimensions.height}
+                    scale={pdfScale}
                   />
                 </div>
               ))}
