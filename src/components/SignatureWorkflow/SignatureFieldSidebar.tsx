@@ -46,8 +46,8 @@ const SignatureFieldSidebar: React.FC<SignatureFieldSidebarProps> = ({
   );
 
   return (
-    <div className="w-80 bg-white border-l border-gray-200 flex flex-col">
-      <div className="p-4 border-b">
+    <div className="w-80 bg-white border-l border-gray-200 flex flex-col h-full">
+      <div className="p-4 border-b flex-shrink-0">
         <h2 className="text-xl font-semibold">Signing options</h2>
       </div>
 
@@ -99,7 +99,7 @@ const SignatureFieldSidebar: React.FC<SignatureFieldSidebarProps> = ({
       </div>
 
       {/* Sign Button */}
-      <div className="p-4 border-t">
+      <div className="p-4 border-t flex-shrink-0">
         <Button 
           onClick={onSign}
           className="w-full bg-red-500 hover:bg-red-600 text-white h-12 text-lg"

@@ -1,26 +1,14 @@
 
 import React, { useState } from 'react';
-import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { PDFProcessor } from '@/services/pdfProcessor';
 import PDFViewer from '../PDFViewer';
 import SignatureDetailsModal, { SignatureDetails } from './SignatureDetailsModal';
 import SignatureFieldSidebar from './SignatureFieldSidebar';
 import DraggableField from './DraggableField';
 import CompanyStampUploadModal from './CompanyStampUploadModal';
-
-interface SignatureField {
-  id: string;
-  type: 'signature' | 'initials' | 'name' | 'date' | 'text' | 'company_stamp';
-  label: string;
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-  pageNumber: number;
-  value?: string;
-  isRequired: boolean;
-}
+import { SignatureField, SignatureFieldManager } from './SignatureFieldManager';
+import { requiredFields, optionalFields } from './SignatureFieldConfig';
+import { PDFSigningProcessor } from './PDFSigningProcessor';
 
 interface SignatureEditorStepProps {
   file: File;
@@ -40,54 +28,6 @@ const SignatureEditorStep: React.FC<SignatureEditorStepProps> = ({
   const [signatureFields, setSignatureFields] = useState<SignatureField[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const { toast } = useToast();
-
-  const requiredFields = [
-    {
-      id: 'signature',
-      type: 'signature' as const,
-      label: 'Signature',
-      icon: <div className="text-blue-500">✍️</div>,
-      isRequired: true
-    }
-  ];
-
-  const optionalFields = [
-    {
-      id: 'initials',
-      type: 'initials' as const,
-      label: 'Initials',
-      icon: <div className="text-green-500">AC</div>,
-      isRequired: false
-    },
-    {
-      id: 'name',
-      type: 'name' as const,
-      label: 'Name',
-      icon: <div className="text-purple-500">👤</div>,
-      isRequired: false
-    },
-    {
-      id: 'date',
-      type: 'date' as const,
-      label: 'Date',
-      icon: <div className="text-orange-500">📅</div>,
-      isRequired: false
-    },
-    {
-      id: 'text',
-      type: 'text' as const,
-      label: 'Text',
-      icon: <div className="text-gray-500">📝</div>,
-      isRequired: false
-    },
-    {
-      id: 'company_stamp',
-      type: 'company_stamp' as const,
-      label: 'Company Stamp',
-      icon: <div className="text-red-500">🏢</div>,
-      isRequired: false
-    }
-  ];
 
   const handleSignatureDetailsSave = (details: SignatureDetails) => {
     console.log('Signature details saved:', details);
@@ -113,76 +53,23 @@ const SignatureEditorStep: React.FC<SignatureEditorStepProps> = ({
   const handleAddField = (fieldType: string) => {
     console.log('Adding field:', fieldType);
     
-    // Show signature modal if signature field is added and details not set
     if (fieldType === 'signature' && !signatureDetails) {
       setShowSignatureModal(true);
       return;
     }
 
-    // Show company stamp modal if company stamp field is added and no stamp uploaded
     if (fieldType === 'company_stamp' && !companyStampImage) {
       setShowCompanyStampModal(true);
       return;
     }
 
-    const newField: SignatureField = {
-      id: `${fieldType}_${Date.now()}`,
-      type: fieldType as any,
-      label: fieldType.charAt(0).toUpperCase() + fieldType.slice(1),
-      x: 50,
-      y: 50,
-      width: getFieldWidth(fieldType),
-      height: getFieldHeight(fieldType),
-      pageNumber: 1,
-      value: getFieldValue(fieldType),
-      isRequired: fieldType === 'signature'
-    };
-
+    const newField = SignatureFieldManager.createField(fieldType, signatureDetails, companyStampImage);
     setSignatureFields(prev => [...prev, newField]);
     
     toast({
       title: 'Field added',
       description: `${fieldType} field added. Drag it to position on the document.`,
     });
-  };
-
-  const getFieldWidth = (fieldType: string): number => {
-    switch (fieldType) {
-      case 'signature': return 200;
-      case 'initials': return 100;
-      case 'company_stamp': return 150;
-      case 'date': return 120;
-      case 'text': return 150;
-      case 'name': return 180;
-      default: return 150;
-    }
-  };
-
-  const getFieldHeight = (fieldType: string): number => {
-    switch (fieldType) {
-      case 'signature': return 80;
-      case 'company_stamp': return 80;
-      default: return 50;
-    }
-  };
-
-  const getFieldValue = (fieldType: string): string => {
-    switch (fieldType) {
-      case 'signature':
-        return signatureDetails?.signatureData || signatureDetails?.fullName || '';
-      case 'initials':
-        return signatureDetails?.initials || '';
-      case 'name':
-        return signatureDetails?.fullName || '';
-      case 'date':
-        return new Date().toLocaleDateString();
-      case 'text':
-        return 'Custom Text';
-      case 'company_stamp':
-        return companyStampImage || '';
-      default:
-        return '';
-    }
   };
 
   const handleFieldPositionChange = (id: string, x: number, y: number) => {
@@ -229,24 +116,7 @@ const SignatureEditorStep: React.FC<SignatureEditorStepProps> = ({
     setIsProcessing(true);
 
     try {
-      console.log('Starting PDF signing process...');
-      const fileBuffer = await file.arrayBuffer();
-      const signaturePositions = signatureFields.map(field => ({
-        x: field.x,
-        y: field.y,
-        signatureData: field.value || '',
-        pageNumber: field.pageNumber,
-        width: field.width,
-        height: field.height,
-        fieldType: field.type
-      }));
-
-      console.log('Signature positions:', signaturePositions);
-
-      const signedPdfBytes = await PDFProcessor.addSignaturesToPDF(fileBuffer, signaturePositions);
-      const signedBlob = new Blob([signedPdfBytes], { type: 'application/pdf' });
-      
-      console.log('PDF signed successfully');
+      const signedBlob = await PDFSigningProcessor.signPDF(file, signatureFields);
       onComplete(signedBlob);
       
       toast({
@@ -267,8 +137,9 @@ const SignatureEditorStep: React.FC<SignatureEditorStepProps> = ({
   };
 
   return (
-    <div className="flex h-full">
-      <div className="flex-1 bg-white relative overflow-hidden">
+    <div className="flex h-full w-full">
+      {/* Document Viewer - Takes maximum space */}
+      <div className="flex-1 bg-white relative overflow-hidden min-w-0">
         <PDFViewer
           file={file}
           signatures={[]}
@@ -298,13 +169,16 @@ const SignatureEditorStep: React.FC<SignatureEditorStepProps> = ({
         </div>
       </div>
       
-      <SignatureFieldSidebar
-        onAddField={handleAddField}
-        requiredFields={requiredFields}
-        optionalFields={optionalFields}
-        onSign={handleSign}
-        isProcessing={isProcessing}
-      />
+      {/* Sidebar - Fixed width, only takes necessary space */}
+      <div className="flex-shrink-0">
+        <SignatureFieldSidebar
+          onAddField={handleAddField}
+          requiredFields={requiredFields}
+          optionalFields={optionalFields}
+          onSign={handleSign}
+          isProcessing={isProcessing}
+        />
+      </div>
 
       {/* Modals */}
       {showSignatureModal && (
