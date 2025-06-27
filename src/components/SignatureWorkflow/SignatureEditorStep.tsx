@@ -28,6 +28,7 @@ const SignatureEditorStep: React.FC<SignatureEditorStepProps> = ({
   const [signatureFields, setSignatureFields] = useState<SignatureField[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [pdfScale, setPdfScale] = useState(1);
+  const [currentPage, setCurrentPage] = useState(1);
   const [pdfContainerDimensions, setPdfContainerDimensions] = useState({ width: 800, height: 600 });
   const { toast } = useToast();
 
@@ -53,7 +54,7 @@ const SignatureEditorStep: React.FC<SignatureEditorStepProps> = ({
   };
 
   const handleAddField = (fieldType: string) => {
-    console.log('Adding field:', fieldType);
+    console.log('Adding field:', fieldType, 'on page:', currentPage);
     
     if (fieldType === 'signature' && !signatureDetails) {
       setShowSignatureModal(true);
@@ -65,19 +66,19 @@ const SignatureEditorStep: React.FC<SignatureEditorStepProps> = ({
       return;
     }
 
-    const newField = SignatureFieldManager.createField(fieldType, signatureDetails, companyStampImage);
+    const newField = SignatureFieldManager.createField(fieldType, signatureDetails, companyStampImage, currentPage);
     setSignatureFields(prev => [...prev, newField]);
     
     toast({
       title: 'Field added',
-      description: `${fieldType} field added. Drag it to position on the document.`,
+      description: `${fieldType} field added to page ${currentPage}. Drag it to position on the document.`,
     });
   };
 
   const handleFieldPositionChange = (id: string, x: number, y: number) => {
-    console.log('Field position changed:', id, x, y);
+    console.log('Field position changed:', id, x, y, 'on page:', currentPage);
     setSignatureFields(prev => prev.map(field => 
-      field.id === id ? { ...field, x, y } : field
+      field.id === id ? { ...field, x, y, pageNumber: currentPage } : field
     ));
   };
 
@@ -105,6 +106,11 @@ const SignatureEditorStep: React.FC<SignatureEditorStepProps> = ({
     }
   };
 
+  const handlePageChange = (pageNumber: number) => {
+    console.log('Page changed to:', pageNumber);
+    setCurrentPage(pageNumber);
+  };
+
   const handleSign = async () => {
     if (!file || signatureFields.length === 0) {
       toast({
@@ -118,6 +124,7 @@ const SignatureEditorStep: React.FC<SignatureEditorStepProps> = ({
     setIsProcessing(true);
 
     try {
+      console.log('Signing PDF with fields:', signatureFields);
       const signedBlob = await PDFSigningProcessor.signPDF(file, signatureFields);
       onComplete(signedBlob);
       
@@ -138,6 +145,9 @@ const SignatureEditorStep: React.FC<SignatureEditorStepProps> = ({
     }
   };
 
+  // Get fields for current page only
+  const currentPageFields = signatureFields.filter(field => field.pageNumber === currentPage);
+
   return (
     <div className="flex h-full w-full bg-gray-50">
       {/* Document Viewer Container */}
@@ -150,20 +160,21 @@ const SignatureEditorStep: React.FC<SignatureEditorStepProps> = ({
             onSignatureRemove={() => {}}
             onScaleChange={setPdfScale}
             onContainerDimensionsChange={setPdfContainerDimensions}
+            onPageChange={handlePageChange}
           />
           
-          {/* Fixed Position Overlay for Draggable Fields */}
+          {/* Fixed Position Overlay for Draggable Fields - Only for Current Page */}
           <div 
             className="absolute inset-0 pointer-events-none z-10"
             style={{
-              top: '60px', // Account for PDF controls height
-              left: '16px', // Account for padding
+              top: '60px',
+              left: '16px',
               right: '16px',
               bottom: '16px'
             }}
           >
             <div className="relative w-full h-full pointer-events-none">
-              {signatureFields.map((field) => (
+              {currentPageFields.map((field) => (
                 <div key={field.id} className="pointer-events-auto">
                   <DraggableField
                     id={field.id}
@@ -177,8 +188,8 @@ const SignatureEditorStep: React.FC<SignatureEditorStepProps> = ({
                     onRemove={handleFieldRemove}
                     onEdit={handleFieldEdit}
                     value={field.value}
-                    containerWidth={pdfContainerDimensions.width - 32} // Account for padding
-                    containerHeight={pdfContainerDimensions.height - 76} // Account for controls and padding
+                    containerWidth={pdfContainerDimensions.width - 32}
+                    containerHeight={pdfContainerDimensions.height - 76}
                     scale={pdfScale}
                   />
                 </div>
@@ -196,6 +207,9 @@ const SignatureEditorStep: React.FC<SignatureEditorStepProps> = ({
           optionalFields={SignatureFieldConfig.optionalFields}
           onSign={handleSign}
           isProcessing={isProcessing}
+          currentPage={currentPage}
+          totalFields={signatureFields.length}
+          currentPageFields={currentPageFields.length}
         />
       </div>
 

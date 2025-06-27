@@ -57,16 +57,21 @@ export class SignatureFieldManager {
     }
   }
 
-  static createField(fieldType: string, signatureDetails: SignatureDetails | null, companyStampImage: string | null): SignatureField {
+  static createField(
+    fieldType: string, 
+    signatureDetails: SignatureDetails | null, 
+    companyStampImage: string | null,
+    currentPage: number = 1
+  ): SignatureField {
     return {
-      id: `${fieldType}_${Date.now()}`,
+      id: `${fieldType}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
       type: fieldType as any,
       label: fieldType.charAt(0).toUpperCase() + fieldType.slice(1),
       x: 50,
       y: 50,
       width: this.getFieldWidth(fieldType),
       height: this.getFieldHeight(fieldType),
-      pageNumber: 1,
+      pageNumber: currentPage,
       value: this.getFieldValue(fieldType, signatureDetails, companyStampImage),
       isRequired: fieldType === 'signature'
     };

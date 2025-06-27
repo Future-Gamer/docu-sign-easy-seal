@@ -11,6 +11,7 @@ interface PDFViewerProps {
   onSignatureRemove: (id: string) => void;
   onScaleChange?: (scale: number) => void;
   onContainerDimensionsChange?: (dimensions: { width: number; height: number }) => void;
+  onPageChange?: (pageNumber: number) => void;
   className?: string;
 }
 
@@ -21,6 +22,7 @@ const PDFViewer: React.FC<PDFViewerProps> = ({
   onSignatureRemove,
   onScaleChange,
   onContainerDimensionsChange,
+  onPageChange,
   className = ''
 }) => {
   const [pdfUrl, setPdfUrl] = useState<string>('');
@@ -37,6 +39,21 @@ const PDFViewer: React.FC<PDFViewerProps> = ({
       setPdfUrl(url);
       setIsLoading(false);
       
+      // Load PDF to get total pages
+      const loadPDF = async () => {
+        try {
+          const arrayBuffer = await file.arrayBuffer();
+          const { PDFDocument } = await import('pdf-lib');
+          const pdfDoc = await PDFDocument.load(arrayBuffer);
+          setTotalPages(pdfDoc.getPageCount());
+        } catch (error) {
+          console.error('Error loading PDF:', error);
+          setTotalPages(1);
+        }
+      };
+      
+      loadPDF();
+      
       return () => URL.revokeObjectURL(url);
     }
   }, [file]);
@@ -47,6 +64,13 @@ const PDFViewer: React.FC<PDFViewerProps> = ({
       onScaleChange(scale);
     }
   }, [scale, onScaleChange]);
+
+  // Notify parent component of page changes
+  useEffect(() => {
+    if (onPageChange) {
+      onPageChange(currentPage);
+    }
+  }, [currentPage, onPageChange]);
 
   // Notify parent component of container dimension changes
   useEffect(() => {
@@ -160,8 +184,7 @@ const PDFViewer: React.FC<PDFViewerProps> = ({
                 className="w-full h-full border-0"
                 title="PDF Preview"
                 onLoad={() => {
-                  console.log('PDF loaded successfully');
-                  setTotalPages(5); // Default estimate
+                  console.log('PDF loaded successfully, page:', currentPage);
                 }}
               />
               

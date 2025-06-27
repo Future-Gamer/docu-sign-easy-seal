@@ -2,7 +2,7 @@
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { PenTool, Plus } from 'lucide-react';
+import { PenTool, Plus, FileText } from 'lucide-react';
 
 interface SignatureField {
   id: string;
@@ -18,6 +18,9 @@ interface SignatureFieldSidebarProps {
   optionalFields: SignatureField[];
   onSign: () => void;
   isProcessing?: boolean;
+  currentPage?: number;
+  totalFields?: number;
+  currentPageFields?: number;
 }
 
 const SignatureFieldSidebar: React.FC<SignatureFieldSidebarProps> = ({
@@ -25,7 +28,10 @@ const SignatureFieldSidebar: React.FC<SignatureFieldSidebarProps> = ({
   requiredFields,
   optionalFields,
   onSign,
-  isProcessing = false
+  isProcessing = false,
+  currentPage = 1,
+  totalFields = 0,
+  currentPageFields = 0
 }) => {
   const renderField = (field: SignatureField, index: number) => (
     <div key={field.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
@@ -49,6 +55,16 @@ const SignatureFieldSidebar: React.FC<SignatureFieldSidebarProps> = ({
     <div className="w-80 bg-white border-l border-gray-200 flex flex-col h-full">
       <div className="p-4 border-b flex-shrink-0">
         <h2 className="text-xl font-semibold">Signing options</h2>
+        <div className="mt-2 text-sm text-gray-600">
+          <div className="flex items-center space-x-2">
+            <FileText className="h-4 w-4" />
+            <span>Page {currentPage}</span>
+          </div>
+          <div className="mt-1 text-xs">
+            {currentPageFields} field{currentPageFields !== 1 ? 's' : ''} on this page
+            {totalFields > 0 && ` • ${totalFields} total`}
+          </div>
+        </div>
       </div>
 
       <div className="flex-1 overflow-y-auto p-4 space-y-6">
@@ -81,6 +97,9 @@ const SignatureFieldSidebar: React.FC<SignatureFieldSidebarProps> = ({
         <Card>
           <CardHeader>
             <CardTitle className="text-sm">Required fields</CardTitle>
+            <p className="text-xs text-gray-500">
+              Add to page {currentPage}
+            </p>
           </CardHeader>
           <CardContent className="space-y-2">
             {requiredFields.map((field, index) => renderField(field, index))}
@@ -91,6 +110,9 @@ const SignatureFieldSidebar: React.FC<SignatureFieldSidebarProps> = ({
         <Card>
           <CardHeader>
             <CardTitle className="text-sm">Optional fields</CardTitle>
+            <p className="text-xs text-gray-500">
+              Add to page {currentPage}
+            </p>
           </CardHeader>
           <CardContent className="space-y-2">
             {optionalFields.map((field, index) => renderField(field, index))}
@@ -103,9 +125,9 @@ const SignatureFieldSidebar: React.FC<SignatureFieldSidebarProps> = ({
         <Button 
           onClick={onSign}
           className="w-full bg-red-500 hover:bg-red-600 text-white h-12 text-lg"
-          disabled={isProcessing}
+          disabled={isProcessing || totalFields === 0}
         >
-          {isProcessing ? 'Processing...' : 'Sign →'}
+          {isProcessing ? 'Processing...' : `Sign ${totalFields > 0 ? `(${totalFields} fields)` : ''} →`}
         </Button>
       </div>
     </div>
