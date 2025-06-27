@@ -3,8 +3,9 @@ import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
-import { Upload, Scissors, ArrowLeft, Download, CheckCircle } from 'lucide-react';
+import { Upload, Scissors, ArrowLeft, Download, CheckCircle, FileText } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { PDFProcessor } from '@/services/pdfProcessor';
 
 interface SplitPDFProps {
   onBack: () => void;
@@ -13,27 +14,42 @@ interface SplitPDFProps {
 const SplitPDF = ({ onBack }: SplitPDFProps) => {
   const [file, setFile] = useState<File | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [processedFiles, setProcessedFiles] = useState<Blob[]>([]);
+  const [processedFiles, setProcessedFiles] = useState<{ blob: Blob; name: string }[]>([]);
   const [progress, setProgress] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
   const { toast } = useToast();
 
   const validateFileSize = (file: File) => {
-    const maxSize = 10 * 1024 * 1024; // 10MB
+    const maxSize = 25 * 1024 * 1024; // 25MB
     return file.size <= maxSize;
   };
 
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
     if (selectedFile && selectedFile.type === 'application/pdf') {
       if (!validateFileSize(selectedFile)) {
         toast({
           title: 'File too large',
-          description: 'Please select a PDF file smaller than 10MB',
+          description: 'Please select a PDF file smaller than 25MB',
           variant: 'destructive',
         });
         return;
       }
+
+      const isValid = await PDFProcessor.validatePDF(selectedFile);
+      if (!isValid) {
+        toast({
+          title: 'Invalid PDF',
+          description: 'The selected file is not a valid PDF',
+          variant: 'destructive',
+        });
+        return;
+      }
+
       setFile(selectedFile);
+      // Reset previous results
+      setProcessedFiles([]);
+      setProgress(0);
     } else {
       toast({
         title: 'Invalid file',
@@ -56,43 +72,79 @@ const SplitPDF = ({ onBack }: SplitPDFProps) => {
     setIsProcessing(true);
     setProgress(0);
     
-    const progressInterval = setInterval(() => {
-      setProgress(prev => {
-        if (prev >= 100) {
-          clearInterval(progressInterval);
-          return 100;
-        }
-        return prev + 10;
-      });
-    }, 300);
+    try {
+      // Simulate splitting process with progress updates
+      const progressInterval = setInterval(() => {
+        setProgress(prev => {
+          if (prev >= 90) {
+            clearInterval(progressInterval);
+            return 90;
+          }
+          return prev + 15;
+        });
+      }, 200);
 
-    setTimeout(() => {
-      // Simulate splitting into 3 pages
-      const mockPages = Array.from({ length: 3 }, (_, i) => 
-        new Blob([`Page ${i + 1} content`], { type: 'application/pdf' })
-      );
-      setProcessedFiles(mockPages);
+      // Split PDF into individual pages
+      const arrayBuffer = await file.arrayBuffer();
+      const splitFiles = await PDFProcessor.splitPDF(arrayBuffer);
+      
+      clearInterval(progressInterval);
+      setProgress(100);
+      
+      const processedFilesData = splitFiles.map((pdfBytes, index) => ({
+        blob: new Blob([pdfBytes], { type: 'application/pdf' }),
+        name: `${file.name.replace('.pdf', '')}_page_${index + 1}.pdf`
+      }));
+
+      setProcessedFiles(processedFilesData);
+      setTotalPages(splitFiles.length);
       setIsProcessing(false);
+      
       toast({
         title: 'PDF split successfully',
-        description: 'Your PDF pages are ready for download',
+        description: `Split into ${splitFiles.length} individual pages`,
       });
-    }, 3000);
+    } catch (error) {
+      console.error('Split error:', error);
+      setIsProcessing(false);
+      setProgress(0);
+      toast({
+        title: 'Split failed',
+        description: 'Failed to split PDF. Please try again.',
+        variant: 'destructive',
+      });
+    }
   };
 
   const handleDownloadAll = () => {
-    if (!processedFiles.length || !file) return;
+    if (!processedFiles.length) return;
     
-    processedFiles.forEach((blob, index) => {
+    processedFiles.forEach(({ blob, name }) => {
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `${file.name.replace('.pdf', '')}_page_${index + 1}.pdf`;
+      a.download = name;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
     });
+
+    toast({
+      title: 'Downloads started',
+      description: `Downloading ${processedFiles.length} PDF files`,
+    });
+  };
+
+  const handleDownloadSingle = (fileData: { blob: Blob; name: string }) => {
+    const url = URL.createObjectURL(fileData.blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = fileData.name;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   };
 
   return (
@@ -116,14 +168,18 @@ const SplitPDF = ({ onBack }: SplitPDFProps) => {
               <span>Split PDF</span>
             </CardTitle>
             <CardDescription>
-              Extract pages from your PDF (Max 10MB)
+              Extract individual pages from your PDF (Max 25MB)
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
-            <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center bg-gray-50">
+            {/* File Upload Area */}
+            <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center bg-gray-50 hover:bg-gray-100 transition-colors">
               <Upload className="h-12 w-12 text-gray-400 mx-auto mb-4" />
               <p className="text-lg font-medium text-gray-900 mb-2">
                 Select a PDF file to split
+              </p>
+              <p className="text-sm text-gray-500 mb-4">
+                Each page will be saved as a separate PDF file
               </p>
               <input
                 type="file"
@@ -139,13 +195,14 @@ const SplitPDF = ({ onBack }: SplitPDFProps) => {
               </label>
             </div>
 
+            {/* Selected File Display */}
             {file && (
-              <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
+              <div className="p-4 bg-orange-50 rounded-lg border border-orange-200">
                 <div className="flex items-center space-x-3">
                   <div className="bg-orange-100 p-2 rounded">
                     <Scissors className="h-4 w-4 text-orange-600" />
                   </div>
-                  <div>
+                  <div className="flex-1">
                     <p className="font-medium text-gray-900">{file.name}</p>
                     <p className="text-sm text-gray-500">
                       {(file.size / 1024 / 1024).toFixed(2)} MB
@@ -155,24 +212,29 @@ const SplitPDF = ({ onBack }: SplitPDFProps) => {
               </div>
             )}
 
+            {/* Progress Display */}
             {isProcessing && (
               <div className="space-y-4">
-                <Progress value={progress} className="w-full" />
+                <Progress value={progress} className="w-full h-2" />
                 <p className="text-center text-sm text-gray-600">
                   Splitting PDF... {progress}%
                 </p>
               </div>
             )}
 
-            {!processedFiles.length && file && !isProcessing && (
+            {/* Split Button */}
+            {file && !processedFiles.length && !isProcessing && (
               <Button
                 onClick={handleSplit}
-                className="w-full"
+                className="w-full bg-orange-600 hover:bg-orange-700"
+                size="lg"
               >
+                <Scissors className="h-4 w-4 mr-2" />
                 Split PDF
               </Button>
             )}
 
+            {/* Results Display */}
             {processedFiles.length > 0 && (
               <div className="space-y-4">
                 <div className="p-4 bg-green-50 rounded-lg border border-green-200 text-center">
@@ -185,12 +247,40 @@ const SplitPDF = ({ onBack }: SplitPDFProps) => {
                   </p>
                 </div>
                 
+                {/* Individual File Downloads */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {processedFiles.map((fileData, index) => (
+                    <div 
+                      key={index}
+                      className="p-3 bg-gray-50 rounded-lg border border-gray-200 flex items-center justify-between"
+                    >
+                      <div className="flex items-center space-x-2">
+                        <FileText className="h-4 w-4 text-gray-500" />
+                        <span className="text-sm font-medium text-gray-700">
+                          Page {index + 1}
+                        </span>
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleDownloadSingle(fileData)}
+                        className="text-xs"
+                      >
+                        <Download className="h-3 w-3 mr-1" />
+                        Download
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Download All Button */}
                 <Button
                   onClick={handleDownloadAll}
                   className="w-full"
+                  size="lg"
                 >
                   <Download className="h-4 w-4 mr-2" />
-                  Download All Pages
+                  Download All Pages ({processedFiles.length} files)
                 </Button>
               </div>
             )}

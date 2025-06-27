@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import PDFViewer from '../PDFViewer';
@@ -139,7 +140,7 @@ const SignatureEditorStep: React.FC<SignatureEditorStepProps> = ({
 
   return (
     <div className="flex h-full w-full bg-gray-50">
-      {/* Document Viewer - Takes maximum space */}
+      {/* Document Viewer Container */}
       <div className="flex-1 bg-white relative overflow-hidden min-w-0">
         <div className="relative w-full h-full">
           <PDFViewer
@@ -151,9 +152,17 @@ const SignatureEditorStep: React.FC<SignatureEditorStepProps> = ({
             onContainerDimensionsChange={setPdfContainerDimensions}
           />
           
-          {/* Draggable Fields Overlay */}
-          <div className="absolute inset-0 pointer-events-none z-10">
-            <div className="relative w-full h-full">
+          {/* Fixed Position Overlay for Draggable Fields */}
+          <div 
+            className="absolute inset-0 pointer-events-none z-10"
+            style={{
+              top: '60px', // Account for PDF controls height
+              left: '16px', // Account for padding
+              right: '16px',
+              bottom: '16px'
+            }}
+          >
+            <div className="relative w-full h-full pointer-events-none">
               {signatureFields.map((field) => (
                 <div key={field.id} className="pointer-events-auto">
                   <DraggableField
@@ -168,8 +177,8 @@ const SignatureEditorStep: React.FC<SignatureEditorStepProps> = ({
                     onRemove={handleFieldRemove}
                     onEdit={handleFieldEdit}
                     value={field.value}
-                    containerWidth={pdfContainerDimensions.width}
-                    containerHeight={pdfContainerDimensions.height}
+                    containerWidth={pdfContainerDimensions.width - 32} // Account for padding
+                    containerHeight={pdfContainerDimensions.height - 76} // Account for controls and padding
                     scale={pdfScale}
                   />
                 </div>
@@ -179,7 +188,7 @@ const SignatureEditorStep: React.FC<SignatureEditorStepProps> = ({
         </div>
       </div>
       
-      {/* Sidebar - Fixed width */}
+      {/* Sidebar */}
       <div className="flex-shrink-0 w-80 bg-white border-l border-gray-200">
         <SignatureFieldSidebar
           onAddField={handleAddField}

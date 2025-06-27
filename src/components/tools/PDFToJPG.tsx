@@ -3,8 +3,9 @@ import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
-import { Upload, FileImage, ArrowLeft, Download, CheckCircle } from 'lucide-react';
+import { Upload, FileImage, ArrowLeft, Download, CheckCircle, Image } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { PDFProcessor } from '@/services/pdfProcessor';
 
 interface PDFToJPGProps {
   onBack: () => void;
@@ -13,27 +14,40 @@ interface PDFToJPGProps {
 const PDFToJPG = ({ onBack }: PDFToJPGProps) => {
   const [file, setFile] = useState<File | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [processedFiles, setProcessedFiles] = useState<Blob[]>([]);
+  const [processedFiles, setProcessedFiles] = useState<{ blob: Blob; name: string }[]>([]);
   const [progress, setProgress] = useState(0);
   const { toast } = useToast();
 
   const validateFileSize = (file: File) => {
-    const maxSize = 10 * 1024 * 1024; // 10MB
+    const maxSize = 25 * 1024 * 1024; // 25MB
     return file.size <= maxSize;
   };
 
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
     if (selectedFile && selectedFile.type === 'application/pdf') {
       if (!validateFileSize(selectedFile)) {
         toast({
           title: 'File too large',
-          description: 'Please select a PDF file smaller than 10MB',
+          description: 'Please select a PDF file smaller than 25MB',
           variant: 'destructive',
         });
         return;
       }
+
+      const isValid = await PDFProcessor.validatePDF(selectedFile);
+      if (!isValid) {
+        toast({
+          title: 'Invalid PDF',
+          description: 'The selected file is not a valid PDF',
+          variant: 'destructive',
+        });
+        return;
+      }
+
       setFile(selectedFile);
+      setProcessedFiles([]);
+      setProgress(0);
     } else {
       toast({
         title: 'Invalid file',
@@ -56,43 +70,76 @@ const PDFToJPG = ({ onBack }: PDFToJPGProps) => {
     setIsProcessing(true);
     setProgress(0);
     
-    const progressInterval = setInterval(() => {
-      setProgress(prev => {
-        if (prev >= 100) {
-          clearInterval(progressInterval);
-          return 100;
-        }
-        return prev + 10;
-      });
-    }, 300);
+    try {
+      const progressInterval = setInterval(() => {
+        setProgress(prev => {
+          if (prev >= 90) {
+            clearInterval(progressInterval);
+            return 90;
+          }
+          return prev + 15;
+        });
+      }, 200);
 
-    setTimeout(() => {
-      // Create mock JPG files (simulating 3 pages)
-      const mockImages = Array.from({ length: 3 }, (_, i) => 
-        new Blob([`mock image data for page ${i + 1}`], { type: 'image/jpeg' })
-      );
-      setProcessedFiles(mockImages);
+      const arrayBuffer = await file.arrayBuffer();
+      const imageBlobs = await PDFProcessor.convertPDFToImages(arrayBuffer);
+      
+      clearInterval(progressInterval);
+      setProgress(100);
+      
+      const processedFilesData = imageBlobs.map((blob, index) => ({
+        blob,
+        name: `${file.name.replace('.pdf', '')}_page_${index + 1}.jpg`
+      }));
+
+      setProcessedFiles(processedFilesData);
       setIsProcessing(false);
+      
       toast({
         title: 'PDF converted successfully',
-        description: 'Your JPG images are ready for download',
+        description: `Converted to ${imageBlobs.length} JPG images`,
       });
-    }, 3000);
+    } catch (error) {
+      console.error('Conversion error:', error);
+      setIsProcessing(false);
+      setProgress(0);
+      toast({
+        title: 'Conversion failed',
+        description: 'Failed to convert PDF to JPG. Please try again.',
+        variant: 'destructive',
+      });
+    }
   };
 
   const handleDownloadAll = () => {
-    if (!processedFiles.length || !file) return;
+    if (!processedFiles.length) return;
     
-    processedFiles.forEach((blob, index) => {
+    processedFiles.forEach(({ blob, name }) => {
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `${file.name.replace('.pdf', '')}_page_${index + 1}.jpg`;
+      a.download = name;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
     });
+
+    toast({
+      title: 'Downloads started',
+      description: `Downloading ${processedFiles.length} JPG files`,
+    });
+  };
+
+  const handleDownloadSingle = (fileData: { blob: Blob; name: string }) => {
+    const url = URL.createObjectURL(fileData.blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = fileData.name;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   };
 
   return (
@@ -116,14 +163,17 @@ const PDFToJPG = ({ onBack }: PDFToJPGProps) => {
               <span>PDF to JPG</span>
             </CardTitle>
             <CardDescription>
-              Convert PDF pages to JPG images (Max 10MB)
+              Convert PDF pages to high-quality JPG images (Max 25MB)
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
-            <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center bg-gray-50">
+            <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center bg-gray-50 hover:bg-gray-100 transition-colors">
               <Upload className="h-12 w-12 text-gray-400 mx-auto mb-4" />
               <p className="text-lg font-medium text-gray-900 mb-2">
                 Select a PDF file to convert
+              </p>
+              <p className="text-sm text-gray-500 mb-4">
+                Each page will be converted to a separate JPG image
               </p>
               <input
                 type="file"
@@ -140,12 +190,12 @@ const PDFToJPG = ({ onBack }: PDFToJPGProps) => {
             </div>
 
             {file && (
-              <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
+              <div className="p-4 bg-green-50 rounded-lg border border-green-200">
                 <div className="flex items-center space-x-3">
                   <div className="bg-green-100 p-2 rounded">
                     <FileImage className="h-4 w-4 text-green-600" />
                   </div>
-                  <div>
+                  <div className="flex-1">
                     <p className="font-medium text-gray-900">{file.name}</p>
                     <p className="text-sm text-gray-500">
                       {(file.size / 1024 / 1024).toFixed(2)} MB
@@ -157,18 +207,20 @@ const PDFToJPG = ({ onBack }: PDFToJPGProps) => {
 
             {isProcessing && (
               <div className="space-y-4">
-                <Progress value={progress} className="w-full" />
+                <Progress value={progress} className="w-full h-2" />
                 <p className="text-center text-sm text-gray-600">
                   Converting to JPG... {progress}%
                 </p>
               </div>
             )}
 
-            {processedFiles.length === 0 && file && !isProcessing && (
+            {file && !processedFiles.length && !isProcessing && (
               <Button
                 onClick={handleConvert}
-                className="w-full"
+                className="w-full bg-green-600 hover:bg-green-700"
+                size="lg"
               >
+                <FileImage className="h-4 w-4 mr-2" />
                 Convert to JPG
               </Button>
             )}
@@ -185,12 +237,38 @@ const PDFToJPG = ({ onBack }: PDFToJPGProps) => {
                   </p>
                 </div>
                 
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {processedFiles.map((fileData, index) => (
+                    <div 
+                      key={index}
+                      className="p-3 bg-gray-50 rounded-lg border border-gray-200 flex items-center justify-between"
+                    >
+                      <div className="flex items-center space-x-2">
+                        <Image className="h-4 w-4 text-gray-500" />
+                        <span className="text-sm font-medium text-gray-700">
+                          Page {index + 1}
+                        </span>
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleDownloadSingle(fileData)}
+                        className="text-xs"
+                      >
+                        <Download className="h-3 w-3 mr-1" />
+                        Download
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+
                 <Button
                   onClick={handleDownloadAll}
                   className="w-full"
+                  size="lg"
                 >
                   <Download className="h-4 w-4 mr-2" />
-                  Download All JPG Files
+                  Download All Images ({processedFiles.length} files)
                 </Button>
               </div>
             )}

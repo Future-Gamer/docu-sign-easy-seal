@@ -1,3 +1,4 @@
+
 import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
 
 interface SignaturePosition {
@@ -146,6 +147,123 @@ export class PDFProcessor {
         font,
         color: rgb(0, 0, 0),
       });
+    }
+  }
+
+  static async splitPDF(pdfBytes: ArrayBuffer): Promise<Uint8Array[]> {
+    try {
+      const pdfDoc = await PDFDocument.load(pdfBytes);
+      const pages = pdfDoc.getPages();
+      const splitPDFs: Uint8Array[] = [];
+
+      for (let i = 0; i < pages.length; i++) {
+        const newPdf = await PDFDocument.create();
+        const [copiedPage] = await newPdf.copyPages(pdfDoc, [i]);
+        newPdf.addPage(copiedPage);
+        
+        const pdfBytesResult = await newPdf.save();
+        splitPDFs.push(pdfBytesResult);
+      }
+
+      return splitPDFs;
+    } catch (error) {
+      console.error('Error splitting PDF:', error);
+      throw new Error(`Failed to split PDF: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  static async convertPDFToImages(pdfBytes: ArrayBuffer): Promise<Blob[]> {
+    try {
+      const pdfDoc = await PDFDocument.load(pdfBytes);
+      const pages = pdfDoc.getPages();
+      const images: Blob[] = [];
+
+      // For demo purposes, create mock image blobs
+      // In a real implementation, you'd use a library like pdf2pic or PDF.js
+      for (let i = 0; i < pages.length; i++) {
+        // Create a canvas and draw PDF page content
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        canvas.width = 595; // A4 width in points
+        canvas.height = 842; // A4 height in points
+        
+        if (ctx) {
+          // Fill with white background
+          ctx.fillStyle = 'white';
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+          
+          // Add some placeholder content
+          ctx.fillStyle = 'black';
+          ctx.font = '16px Arial';
+          ctx.fillText(`Page ${i + 1} Content`, 50, 100);
+          ctx.fillText('This is a converted PDF page', 50, 150);
+        }
+
+        // Convert canvas to blob
+        const blob = await new Promise<Blob>((resolve) => {
+          canvas.toBlob((blob) => {
+            resolve(blob || new Blob());
+          }, 'image/jpeg', 0.9);
+        });
+
+        images.push(blob);
+      }
+
+      return images;
+    } catch (error) {
+      console.error('Error converting PDF to images:', error);
+      throw new Error(`Failed to convert PDF to images: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  static async addWatermarkToPDF(
+    pdfBytes: ArrayBuffer,
+    watermarkText: string,
+    options: {
+      opacity?: number;
+      fontSize?: number;
+      rotation?: number;
+      color?: { r: number; g: number; b: number };
+    } = {}
+  ): Promise<Uint8Array> {
+    try {
+      const pdfDoc = await PDFDocument.load(pdfBytes);
+      const pages = pdfDoc.getPages();
+      const font = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+
+      const {
+        opacity = 0.3,
+        fontSize = 50,
+        rotation = -45,
+        color = { r: 0.7, g: 0.7, b: 0.7 }
+      } = options;
+
+      for (const page of pages) {
+        const { width, height } = page.getSize();
+        
+        // Calculate text dimensions
+        const textWidth = font.widthOfTextAtSize(watermarkText, fontSize);
+        const textHeight = font.heightAtSize(fontSize);
+
+        // Position watermark in center
+        const x = (width - textWidth) / 2;
+        const y = (height - textHeight) / 2;
+
+        page.drawText(watermarkText, {
+          x,
+          y,
+          size: fontSize,
+          font,
+          color: rgb(color.r, color.g, color.b),
+          opacity,
+          rotate: { angle: (rotation * Math.PI) / 180 },
+        });
+      }
+
+      return await pdfDoc.save();
+    } catch (error) {
+      console.error('Error adding watermark:', error);
+      throw new Error(`Failed to add watermark: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 
