@@ -1,5 +1,4 @@
-
-import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
+import { PDFDocument, rgb, StandardFonts, degrees } from 'pdf-lib';
 
 interface SignaturePosition {
   x: number;
@@ -256,7 +255,7 @@ export class PDFProcessor {
           font,
           color: rgb(color.r, color.g, color.b),
           opacity,
-          rotate: { angle: (rotation * Math.PI) / 180 },
+          rotate: degrees(rotation),
         });
       }
 
