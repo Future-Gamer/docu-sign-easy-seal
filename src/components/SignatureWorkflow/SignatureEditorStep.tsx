@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import PDFViewer from '../PDFViewer';
@@ -27,7 +26,7 @@ const SignatureEditorStep: React.FC<SignatureEditorStepProps> = ({
   const [companyStampImage, setCompanyStampImage] = useState<string | null>(null);
   const [signatureFields, setSignatureFields] = useState<SignatureField[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [pdfScale, setPdfScale] = useState(1);
+  const [pdfScale, setPdfScale] = useState(1); // This will be decimal (1.0 = 100%)
   const [currentPage, setCurrentPage] = useState(1);
   const [pdfContainerDimensions, setPdfContainerDimensions] = useState({ width: 800, height: 600 });
   const { toast } = useToast();
