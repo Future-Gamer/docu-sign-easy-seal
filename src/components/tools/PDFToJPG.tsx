@@ -14,7 +14,7 @@ interface PDFToJPGProps {
 const PDFToJPG = ({ onBack }: PDFToJPGProps) => {
   const [file, setFile] = useState<File | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [processedFiles, setProcessedFiles] = useState<{ blob: Blob; name: string }[]>([]);
+  const [processedFiles, setProcessedFiles] = useState<{ blob: Blob; name: string; preview: string }[]>([]);
   const [progress, setProgress] = useState(0);
   const { toast } = useToast();
 
@@ -77,19 +77,20 @@ const PDFToJPG = ({ onBack }: PDFToJPGProps) => {
             clearInterval(progressInterval);
             return 90;
           }
-          return prev + 15;
+          return prev + 10;
         });
-      }, 200);
+      }, 300);
 
       const arrayBuffer = await file.arrayBuffer();
-      const imageBlobs = await PDFProcessor.convertPDFToImages(arrayBuffer);
+      const { imageBlobs, previews } = await PDFProcessor.convertPDFToImages(arrayBuffer);
       
       clearInterval(progressInterval);
       setProgress(100);
       
       const processedFilesData = imageBlobs.map((blob, index) => ({
         blob,
-        name: `${file.name.replace('.pdf', '')}_page_${index + 1}.jpg`
+        name: `${file.name.replace('.pdf', '')}_page_${index + 1}.jpg`,
+        preview: previews[index]
       }));
 
       setProcessedFiles(processedFilesData);
@@ -131,7 +132,7 @@ const PDFToJPG = ({ onBack }: PDFToJPGProps) => {
     });
   };
 
-  const handleDownloadSingle = (fileData: { blob: Blob; name: string }) => {
+  const handleDownloadSingle = (fileData: { blob: Blob; name: string; preview: string }) => {
     const url = URL.createObjectURL(fileData.blob);
     const a = document.createElement('a');
     a.href = url;
@@ -163,7 +164,7 @@ const PDFToJPG = ({ onBack }: PDFToJPGProps) => {
               <span>PDF to JPG</span>
             </CardTitle>
             <CardDescription>
-              Convert PDF pages to high-quality JPG images (Max 25MB)
+              Convert PDF pages to high-quality JPG images with full content visibility (Max 25MB)
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
@@ -173,7 +174,7 @@ const PDFToJPG = ({ onBack }: PDFToJPGProps) => {
                 Select a PDF file to convert
               </p>
               <p className="text-sm text-gray-500 mb-4">
-                Each page will be converted to a separate JPG image
+                Each page will be converted to a separate JPG image with full content
               </p>
               <input
                 type="file"
@@ -209,7 +210,7 @@ const PDFToJPG = ({ onBack }: PDFToJPGProps) => {
               <div className="space-y-4">
                 <Progress value={progress} className="w-full h-2" />
                 <p className="text-center text-sm text-gray-600">
-                  Converting to JPG... {progress}%
+                  Converting to JPG with full content rendering... {progress}%
                 </p>
               </div>
             )}
@@ -237,27 +238,36 @@ const PDFToJPG = ({ onBack }: PDFToJPGProps) => {
                   </p>
                 </div>
                 
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                   {processedFiles.map((fileData, index) => (
                     <div 
                       key={index}
-                      className="p-3 bg-gray-50 rounded-lg border border-gray-200 flex items-center justify-between"
+                      className="p-3 bg-gray-50 rounded-lg border border-gray-200"
                     >
-                      <div className="flex items-center space-x-2">
-                        <Image className="h-4 w-4 text-gray-500" />
-                        <span className="text-sm font-medium text-gray-700">
-                          Page {index + 1}
-                        </span>
+                      <div className="mb-2">
+                        <img 
+                          src={fileData.preview} 
+                          alt={`Page ${index + 1} preview`}
+                          className="w-full h-32 object-cover rounded border"
+                        />
                       </div>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => handleDownloadSingle(fileData)}
-                        className="text-xs"
-                      >
-                        <Download className="h-3 w-3 mr-1" />
-                        Download
-                      </Button>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-2">
+                          <Image className="h-4 w-4 text-gray-500" />
+                          <span className="text-sm font-medium text-gray-700">
+                            Page {index + 1}
+                          </span>
+                        </div>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleDownloadSingle(fileData)}
+                          className="text-xs"
+                        >
+                          <Download className="h-3 w-3 mr-1" />
+                          Download
+                        </Button>
+                      </div>
                     </div>
                   ))}
                 </div>

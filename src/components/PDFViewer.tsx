@@ -2,7 +2,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { ZoomIn, ZoomOut, Download, ChevronLeft, ChevronRight } from 'lucide-react';
+import { ZoomIn, ZoomOut, Download, ChevronLeft, ChevronRight, RotateCw } from 'lucide-react';
 import DraggableSignature from './DraggableSignature';
 
 interface PDFViewerProps {
@@ -27,15 +27,17 @@ const PDFViewer: React.FC<PDFViewerProps> = ({
   className = ''
 }) => {
   const [pdfUrl, setPdfUrl] = useState<string>('');
-  const [scale, setScale] = useState(100); // Changed to percentage
+  const [scale, setScale] = useState(100);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [isLoading, setIsLoading] = useState(true);
+  const [rotation, setRotation] = useState(0);
   const viewerRef = useRef<HTMLDivElement>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
+  const scrollCheckIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Zoom levels in percentages
-  const zoomLevels = [25, 50, 75, 100, 125, 150, 175, 200];
+  // Zoom levels in percentages - more granular control
+  const zoomLevels = [10, 25, 50, 75, 100, 125, 150, 175, 200, 250, 300, 400, 500];
 
   useEffect(() => {
     if (file) {
@@ -76,56 +78,85 @@ const PDFViewer: React.FC<PDFViewerProps> = ({
     }
   }, [currentPage, onPageChange]);
 
-  // Update iframe src when page changes
+  // Update iframe src when page, scale, or rotation changes
   useEffect(() => {
     if (pdfUrl && iframeRef.current) {
-      const newSrc = `${pdfUrl}#page=${currentPage}&toolbar=0&navpanes=0&scrollbar=1&view=FitH&zoom=${scale}`;
+      const rotationParam = rotation ? `&rotate=${rotation}` : '';
+      const newSrc = `${pdfUrl}#page=${currentPage}&toolbar=0&navpanes=0&scrollbar=1&view=FitH&zoom=${scale}${rotationParam}`;
       iframeRef.current.src = newSrc;
     }
-  }, [pdfUrl, currentPage, scale]);
+  }, [pdfUrl, currentPage, scale, rotation]);
 
-  // Listen for scroll events from iframe to detect page changes
+  // Enhanced scroll detection for page changes
+  const detectCurrentPage = useCallback(() => {
+    const iframe = iframeRef.current;
+    if (!iframe) return;
+
+    try {
+      const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
+      if (iframeDoc) {
+        const scrollTop = iframeDoc.documentElement.scrollTop || iframeDoc.body.scrollTop;
+        const scrollHeight = iframeDoc.documentElement.scrollHeight || iframeDoc.body.scrollHeight;
+        const clientHeight = iframeDoc.documentElement.clientHeight || iframeDoc.body.clientHeight;
+        
+        if (scrollHeight > clientHeight) {
+          // Calculate current page based on scroll position
+          const scrollPercentage = scrollTop / (scrollHeight - clientHeight);
+          const estimatedPage = Math.max(1, Math.min(Math.ceil((scrollPercentage * totalPages) + 0.3), totalPages));
+          
+          if (estimatedPage !== currentPage && estimatedPage >= 1 && estimatedPage <= totalPages) {
+            console.log('Page changed via scroll:', estimatedPage);
+            setCurrentPage(estimatedPage);
+          }
+        }
+      }
+    } catch (error) {
+      // Cross-origin restrictions prevent access
+      console.log('Cannot access iframe content for scroll detection');
+    }
+  }, [currentPage, totalPages]);
+
+  // Set up scroll detection
   useEffect(() => {
     const iframe = iframeRef.current;
     if (!iframe) return;
 
-    const handleIframeLoad = () => {
+    const setupScrollDetection = () => {
+      // Clear existing interval
+      if (scrollCheckIntervalRef.current) {
+        clearInterval(scrollCheckIntervalRef.current);
+      }
+
+      // Set up periodic scroll checking
+      scrollCheckIntervalRef.current = setInterval(detectCurrentPage, 500);
+      
       try {
         const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
         if (iframeDoc) {
-          const handleScroll = () => {
-            // This is a simplified approach - in a real implementation,
-            // you might need to use PDF.js or similar library for accurate page detection
-            try {
-              const scrollTop = iframeDoc.documentElement.scrollTop || iframeDoc.body.scrollTop;
-              const scrollHeight = iframeDoc.documentElement.scrollHeight || iframeDoc.body.scrollHeight;
-              const clientHeight = iframeDoc.documentElement.clientHeight || iframeDoc.body.clientHeight;
-              
-              // Estimate current page based on scroll position
-              const scrollPercentage = scrollTop / (scrollHeight - clientHeight);
-              const estimatedPage = Math.min(Math.ceil(scrollPercentage * totalPages) || 1, totalPages);
-              
-              if (estimatedPage !== currentPage && estimatedPage >= 1 && estimatedPage <= totalPages) {
-                setCurrentPage(estimatedPage);
-              }
-            } catch (error) {
-              // Cross-origin or other access issues
-              console.log('Cannot access iframe content for scroll detection');
+          const handleScroll = () => detectCurrentPage();
+          iframeDoc.addEventListener('scroll', handleScroll);
+          
+          return () => {
+            iframeDoc.removeEventListener('scroll', handleScroll);
+            if (scrollCheckIntervalRef.current) {
+              clearInterval(scrollCheckIntervalRef.current);
             }
           };
-
-          iframeDoc.addEventListener('scroll', handleScroll);
-          return () => iframeDoc.removeEventListener('scroll', handleScroll);
         }
       } catch (error) {
-        // Cross-origin restrictions prevent access
-        console.log('Cannot access iframe for scroll events');
+        console.log('Cannot access iframe for direct scroll events, using interval method');
       }
     };
 
-    iframe.addEventListener('load', handleIframeLoad);
-    return () => iframe.removeEventListener('load', handleIframeLoad);
-  }, [currentPage, totalPages]);
+    iframe.addEventListener('load', setupScrollDetection);
+    
+    return () => {
+      iframe.removeEventListener('load', setupScrollDetection);
+      if (scrollCheckIntervalRef.current) {
+        clearInterval(scrollCheckIntervalRef.current);
+      }
+    };
+  }, [detectCurrentPage]);
 
   // Notify parent component of container dimension changes
   useEffect(() => {
@@ -152,25 +183,53 @@ const PDFViewer: React.FC<PDFViewerProps> = ({
   const handleZoomIn = () => {
     const currentIndex = zoomLevels.findIndex(level => level >= scale);
     const nextIndex = Math.min(currentIndex + 1, zoomLevels.length - 1);
-    setScale(zoomLevels[nextIndex]);
+    if (nextIndex > currentIndex) {
+      setScale(zoomLevels[nextIndex]);
+      console.log('Zooming in to:', zoomLevels[nextIndex] + '%');
+    }
   };
 
   const handleZoomOut = () => {
     const currentIndex = zoomLevels.findIndex(level => level >= scale);
     const prevIndex = Math.max(currentIndex - 1, 0);
-    setScale(zoomLevels[prevIndex]);
+    if (prevIndex < currentIndex) {
+      setScale(zoomLevels[prevIndex]);
+      console.log('Zooming out to:', zoomLevels[prevIndex] + '%');
+    }
   };
 
   const handleNextPage = () => {
     if (currentPage < totalPages) {
-      setCurrentPage(prev => prev + 1);
+      const newPage = currentPage + 1;
+      setCurrentPage(newPage);
+      console.log('Next page:', newPage);
+      
+      // Force iframe to navigate to specific page
+      if (iframeRef.current && pdfUrl) {
+        const rotationParam = rotation ? `&rotate=${rotation}` : '';
+        iframeRef.current.src = `${pdfUrl}#page=${newPage}&toolbar=0&navpanes=0&scrollbar=1&view=FitH&zoom=${scale}${rotationParam}`;
+      }
     }
   };
 
   const handlePrevPage = () => {
     if (currentPage > 1) {
-      setCurrentPage(prev => prev - 1);
+      const newPage = currentPage - 1;
+      setCurrentPage(newPage);
+      console.log('Previous page:', newPage);
+      
+      // Force iframe to navigate to specific page
+      if (iframeRef.current && pdfUrl) {
+        const rotationParam = rotation ? `&rotate=${rotation}` : '';
+        iframeRef.current.src = `${pdfUrl}#page=${newPage}&toolbar=0&navpanes=0&scrollbar=1&view=FitH&zoom=${scale}${rotationParam}`;
+      }
     }
+  };
+
+  const handleRotate = () => {
+    const newRotation = (rotation + 90) % 360;
+    setRotation(newRotation);
+    console.log('Rotating PDF to:', newRotation + '°');
   };
 
   const handleDownload = () => {
@@ -230,9 +289,14 @@ const PDFViewer: React.FC<PDFViewerProps> = ({
             </Button>
           </div>
 
-          <Button variant="outline" size="sm" onClick={handleDownload}>
-            <Download className="h-4 w-4" />
-          </Button>
+          <div className="flex items-center space-x-2">
+            <Button variant="outline" size="sm" onClick={handleRotate}>
+              <RotateCw className="h-4 w-4" />
+            </Button>
+            <Button variant="outline" size="sm" onClick={handleDownload}>
+              <Download className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
 
         {/* PDF Viewer Container */}
@@ -245,11 +309,11 @@ const PDFViewer: React.FC<PDFViewerProps> = ({
             <div className="relative w-full h-full">
               <iframe
                 ref={iframeRef}
-                src={`${pdfUrl}#page=${currentPage}&toolbar=0&navpanes=0&scrollbar=1&view=FitH&zoom=${scale}`}
+                src={`${pdfUrl}#page=${currentPage}&toolbar=0&navpanes=0&scrollbar=1&view=FitH&zoom=${scale}${rotation ? `&rotate=${rotation}` : ''}`}
                 className="w-full h-full border-0"
                 title="PDF Preview"
                 onLoad={() => {
-                  console.log('PDF loaded successfully, page:', currentPage, 'zoom:', scale + '%');
+                  console.log('PDF loaded successfully, page:', currentPage, 'zoom:', scale + '%', 'rotation:', rotation + '°');
                 }}
               />
               
