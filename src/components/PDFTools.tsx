@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -31,6 +30,7 @@ import ScanToPDF from './tools/ScanToPDF';
 
 interface PDFToolsProps {
   onBack: () => void;
+  onToolSelect?: (toolId: string) => void;
 }
 
 type ToolType = 
@@ -49,7 +49,7 @@ type ToolType =
   | 'compare'
   | null;
 
-const PDFTools = ({ onBack }: PDFToolsProps) => {
+const PDFTools = ({ onBack, onToolSelect }: PDFToolsProps) => {
   const [selectedTool, setSelectedTool] = useState<ToolType>(null);
 
   const tools = [
@@ -190,6 +190,14 @@ const PDFTools = ({ onBack }: PDFToolsProps) => {
     if (tool && !tool.available) {
       return; // Don't allow selection of unavailable tools
     }
+    
+    // If onToolSelect prop is provided, use it (for external navigation)
+    if (onToolSelect && toolId) {
+      onToolSelect(toolId);
+      return;
+    }
+    
+    // Otherwise use internal state
     setSelectedTool(toolId);
   };
 

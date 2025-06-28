@@ -33,6 +33,11 @@ const Index = () => {
     setSelectedTool(null);
   };
 
+  const handleBackToDashboard = () => {
+    setCurrentView('dashboard');
+    setSelectedTool(null);
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-900 flex items-center justify-center">
@@ -96,7 +101,7 @@ const Index = () => {
           ) : selectedTool ? (
             renderToolComponent()
           ) : (
-            <PDFTools onToolSelect={handleToolSelect} />
+            <PDFTools onBack={handleBackToDashboard} onToolSelect={handleToolSelect} />
           )}
         </>
       ) : (

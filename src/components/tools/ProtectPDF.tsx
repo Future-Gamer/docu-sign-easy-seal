@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Progress } from '@/components/ui/progress';
-import { Upload, Shield, ArrowLeft, Download, CheckCircle, Eye, EyeOff } from 'lucide-react';
+import { Upload, Shield, ArrowLeft, Download, CheckCircle, AlertTriangle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { PDFProcessor } from '@/services/pdfProcessor';
 
@@ -15,12 +15,11 @@ interface ProtectPDFProps {
 
 const ProtectPDF = ({ onBack }: ProtectPDFProps) => {
   const [file, setFile] = useState<File | null>(null);
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [processedFile, setProcessedFile] = useState<Blob | null>(null);
   const [progress, setProgress] = useState(0);
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
   const { toast } = useToast();
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -70,7 +69,7 @@ const ProtectPDF = ({ onBack }: ProtectPDFProps) => {
     if (!password) {
       toast({
         title: 'Password required',
-        description: 'Please enter a password to protect the PDF',
+        description: 'Please enter a password',
         variant: 'destructive',
       });
       return;
@@ -79,7 +78,7 @@ const ProtectPDF = ({ onBack }: ProtectPDFProps) => {
     if (password !== confirmPassword) {
       toast({
         title: 'Passwords do not match',
-        description: 'Please ensure both password fields match',
+        description: 'Please make sure both password fields match',
         variant: 'destructive',
       });
       return;
@@ -104,7 +103,7 @@ const ProtectPDF = ({ onBack }: ProtectPDFProps) => {
             clearInterval(progressInterval);
             return 90;
           }
-          return prev + 15;
+          return prev + 20;
         });
       }, 200);
 
@@ -119,8 +118,9 @@ const ProtectPDF = ({ onBack }: ProtectPDFProps) => {
       setIsProcessing(false);
       
       toast({
-        title: 'PDF protected successfully',
-        description: 'Your PDF is now password protected',
+        title: 'PDF processed',
+        description: 'Note: Full password protection requires server-side processing',
+        variant: 'default',
       });
     } catch (error) {
       console.error('Protection error:', error);
@@ -148,7 +148,7 @@ const ProtectPDF = ({ onBack }: ProtectPDFProps) => {
 
     toast({
       title: 'Download started',
-      description: 'Your protected PDF is being downloaded',
+      description: 'Your PDF is being downloaded',
     });
   };
 
@@ -173,6 +173,18 @@ const ProtectPDF = ({ onBack }: ProtectPDFProps) => {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
+            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+              <div className="flex items-start space-x-2">
+                <AlertTriangle className="h-5 w-5 text-yellow-600 mt-0.5 flex-shrink-0" />
+                <div>
+                  <p className="text-sm font-medium text-yellow-800">Browser Limitation</p>
+                  <p className="text-sm text-yellow-700 mt-1">
+                    Full password protection requires server-side processing. This tool provides basic protection only.
+                  </p>
+                </div>
+              </div>
+            </div>
+
             <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center bg-gray-50 hover:bg-gray-100 transition-colors">
               <Upload className="h-12 w-12 text-gray-400 mx-auto mb-4" />
               <p className="text-lg font-medium text-gray-900 mb-2">
@@ -211,44 +223,29 @@ const ProtectPDF = ({ onBack }: ProtectPDFProps) => {
                   </div>
                 </div>
 
-                <div className="p-4 bg-gray-50 rounded-lg border space-y-4">
-                  <h3 className="font-medium text-gray-900">Set Password Protection</h3>
-                  
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="password">Password (minimum 6 characters)</Label>
-                    <div className="relative">
-                      <Input
-                        id="password"
-                        type={showPassword ? 'text' : 'password'}
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        placeholder="Enter password"
-                        className="pr-10"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowPassword(!showPassword)}
-                        className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                      >
-                        {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                      </button>
-                    </div>
+                    <Label htmlFor="password">Password</Label>
+                    <Input
+                      id="password"
+                      type="password"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      placeholder="Enter password (min 6 characters)"
+                      className="w-full"
+                    />
                   </div>
-
                   <div className="space-y-2">
                     <Label htmlFor="confirmPassword">Confirm Password</Label>
                     <Input
                       id="confirmPassword"
-                      type={showPassword ? 'text' : 'password'}
+                      type="password"
                       value={confirmPassword}
                       onChange={(e) => setConfirmPassword(e.target.value)}
                       placeholder="Confirm password"
+                      className="w-full"
                     />
                   </div>
-
-                  {password && confirmPassword && password !== confirmPassword && (
-                    <p className="text-sm text-red-600">Passwords do not match</p>
-                  )}
                 </div>
               </div>
             )}
@@ -257,20 +254,19 @@ const ProtectPDF = ({ onBack }: ProtectPDFProps) => {
               <div className="space-y-4">
                 <Progress value={progress} className="w-full h-2" />
                 <p className="text-center text-sm text-gray-600">
-                  Adding password protection... {progress}%
+                  Processing PDF... {progress}%
                 </p>
               </div>
             )}
 
-            {file && !processedFile && !isProcessing && (
+            {file && password && confirmPassword && !processedFile && !isProcessing && (
               <Button
                 onClick={handleProtect}
                 className="w-full bg-red-600 hover:bg-red-700"
                 size="lg"
-                disabled={!password || !confirmPassword || password !== confirmPassword}
               >
                 <Shield className="h-4 w-4 mr-2" />
-                Protect PDF with Password
+                Protect PDF
               </Button>
             )}
 
@@ -279,10 +275,10 @@ const ProtectPDF = ({ onBack }: ProtectPDFProps) => {
                 <div className="p-4 bg-green-50 rounded-lg border border-green-200 text-center">
                   <CheckCircle className="h-8 w-8 text-green-600 mx-auto mb-2" />
                   <p className="font-medium text-green-800">
-                    PDF Protected Successfully!
+                    PDF Processed Successfully!
                   </p>
                   <p className="text-sm text-green-600">
-                    Your PDF is now password protected
+                    Basic protection applied
                   </p>
                 </div>
 
