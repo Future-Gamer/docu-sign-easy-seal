@@ -48,17 +48,18 @@ const DraggableField: React.FC<DraggableFieldProps> = ({
     // Find the PDF viewer container by looking for the iframe's parent
     let container = fieldRef.current.parentElement;
     while (container) {
-      const iframe = container.querySelector('iframe');
-      if (iframe && container.classList.contains('relative')) {
+      if (container.classList.contains('relative') && container.querySelector('iframe')) {
         return container;
       }
       container = container.parentElement;
     }
-    return null;
+    return fieldRef.current.parentElement;
   }, []);
 
   const handleMouseMove = useCallback((e: MouseEvent) => {
     if (!isDragging || !fieldRef.current) return;
+    e.preventDefault();
+    e.stopPropagation();
 
     const pdfContainer = findPDFContainer();
     if (!pdfContainer) return;
@@ -70,14 +71,14 @@ const DraggableField: React.FC<DraggableFieldProps> = ({
     const newY = (e.clientY - containerRect.top - dragOffset.y);
     
     // Apply scale factor for positioning
-    const scaledX = newX / scale;
-    const scaledY = newY / scale;
+    const scaledX = newX;
+    const scaledY = newY;
     
     // Get scaled dimensions
-    const scaledWidth = width / scale;
-    const scaledHeight = height / scale;
-    const scaledContainerWidth = containerRect.width / scale;
-    const scaledContainerHeight = containerRect.height / scale;
+    const scaledWidth = width;
+    const scaledHeight = height;
+    const scaledContainerWidth = containerRect.width;
+    const scaledContainerHeight = containerRect.height;
     
     // Constrain to container bounds
     const constrainedX = Math.max(0, Math.min(scaledContainerWidth - scaledWidth, scaledX));
@@ -89,20 +90,24 @@ const DraggableField: React.FC<DraggableFieldProps> = ({
     
     setPosition({ x: percentX, y: percentY });
     onPositionChange(id, percentX, percentY);
-  }, [isDragging, dragOffset, scale, width, height, onPositionChange, id, findPDFContainer]);
+  }, [isDragging, dragOffset, width, height, onPositionChange, id, findPDFContainer]);
 
-  const handleMouseUp = useCallback(() => {
+  const handleMouseUp = useCallback((e: MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
     setIsDragging(false);
     document.body.style.cursor = 'default';
     document.body.style.userSelect = 'auto';
+    document.body.style.pointerEvents = 'auto';
   }, []);
 
   useEffect(() => {
     if (isDragging) {
-      document.addEventListener('mousemove', handleMouseMove);
-      document.addEventListener('mouseup', handleMouseUp);
+      document.addEventListener('mousemove', handleMouseMove, { passive: false });
+      document.addEventListener('mouseup', handleMouseUp, { passive: false });
       document.body.style.cursor = 'grabbing';
       document.body.style.userSelect = 'none';
+      document.body.style.pointerEvents = 'none';
     }
 
     return () => {
@@ -110,6 +115,7 @@ const DraggableField: React.FC<DraggableFieldProps> = ({
       document.removeEventListener('mouseup', handleMouseUp);
       document.body.style.cursor = 'default';
       document.body.style.userSelect = 'auto';
+      document.body.style.pointerEvents = 'auto';
     };
   }, [isDragging, handleMouseMove, handleMouseUp]);
 
@@ -123,7 +129,6 @@ const DraggableField: React.FC<DraggableFieldProps> = ({
     if (!pdfContainer) return;
 
     const fieldRect = fieldRef.current.getBoundingClientRect();
-    const containerRect = pdfContainer.getBoundingClientRect();
     
     // Calculate offset from mouse to field's top-left corner
     setDragOffset({
@@ -132,6 +137,7 @@ const DraggableField: React.FC<DraggableFieldProps> = ({
     });
     
     setIsDragging(true);
+    console.log('Starting drag for field:', id, 'at position:', e.clientX, e.clientY);
   };
 
   // Calculate pixel position from percentage
@@ -142,12 +148,10 @@ const DraggableField: React.FC<DraggableFieldProps> = ({
     }
     
     const containerRect = pdfContainer.getBoundingClientRect();
-    const scaledContainerWidth = containerRect.width / scale;
-    const scaledContainerHeight = containerRect.height / scale;
     
     return {
-      x: (position.x / 100) * scaledContainerWidth,
-      y: (position.y / 100) * scaledContainerHeight
+      x: (position.x / 100) * containerRect.width,
+      y: (position.y / 100) * containerRect.height
     };
   };
 
@@ -214,23 +218,22 @@ const DraggableField: React.FC<DraggableFieldProps> = ({
   return (
     <div
       ref={fieldRef}
-      className={`absolute z-20 select-none ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
+      className={`absolute z-30 select-none ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
       style={{
         left: `${pixelPosition.x}px`,
         top: `${pixelPosition.y}px`,
         width: `${width}px`,
         height: `${height}px`,
-        transform: `scale(${1 / scale})`,
-        transformOrigin: 'top left'
+        pointerEvents: 'auto'
       }}
       onMouseDown={handleMouseDown}
     >
-      <Card className={`border-2 ${getFieldColor()} shadow-lg h-full ${isDragging ? 'shadow-2xl' : ''}`}>
+      <Card className={`border-2 ${getFieldColor()} shadow-lg h-full ${isDragging ? 'shadow-2xl opacity-90' : ''}`}>
         <CardContent className="p-2 relative h-full flex items-center justify-center">
           <Button
             variant="destructive"
             size="sm"
-            className="absolute -top-2 -right-2 h-6 w-6 p-0 z-30"
+            className="absolute -top-2 -right-2 h-6 w-6 p-0 z-40"
             onClick={(e) => {
               e.stopPropagation();
               onRemove(id);
@@ -243,7 +246,7 @@ const DraggableField: React.FC<DraggableFieldProps> = ({
             <Button
               variant="secondary"
               size="sm"
-              className="absolute -top-2 -left-2 h-6 w-6 p-0 z-30"
+              className="absolute -top-2 -left-2 h-6 w-6 p-0 z-40"
               onClick={(e) => {
                 e.stopPropagation();
                 onEdit(id);

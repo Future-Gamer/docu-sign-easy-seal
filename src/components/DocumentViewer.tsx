@@ -166,7 +166,7 @@ const DocumentViewer: React.FC<DocumentViewerProps> = ({
               {!isLoading && !loadError && pdfUrl && (
                 <div className="w-full h-full">
                   <iframe
-                    src={`${pdfUrl}#toolbar=1&navpanes=1&scrollbar=1&page=1&view=FitH`}
+                    src={`${pdfUrl}#toolbar=0&navpanes=0&scrollbar=0&page=1&view=FitH&zoom=100`}
                     className="w-full h-full min-h-[800px] border-0"
                     title="Document Preview"
                     onLoad={() => {

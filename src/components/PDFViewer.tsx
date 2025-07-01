@@ -83,8 +83,9 @@ const PDFViewer: React.FC<PDFViewerProps> = ({
     if (pdfUrl && iframeRef.current) {
       const rotationParam = rotation ? `&rotate=${rotation}` : '';
       // Remove scrollbar and use FitV to fit the page vertically
-      const newSrc = `${pdfUrl}#page=${currentPage}&toolbar=0&navpanes=0&scrollbar=0&view=FitV&zoom=${scale}${rotationParam}`;
+      const newSrc = `${pdfUrl}#page=${currentPage}&toolbar=0&navpanes=0&scrollbar=0&view=FitH&zoom=${scale}${rotationParam}`;
       iframeRef.current.src = newSrc;
+      console.log('Updated PDF src:', newSrc);
     }
   }, [pdfUrl, currentPage, scale, rotation]);
 
@@ -97,16 +98,20 @@ const PDFViewer: React.FC<PDFViewerProps> = ({
           width: rect.width,
           height: rect.height
         });
+        console.log('Container dimensions updated:', rect.width, 'x', rect.height);
       }
     };
 
     updateContainerDimensions();
     
     // Listen for resize events
-    window.addEventListener('resize', updateContainerDimensions);
+    const resizeObserver = new ResizeObserver(updateContainerDimensions);
+    if (viewerRef.current) {
+      resizeObserver.observe(viewerRef.current);
+    }
     
     return () => {
-      window.removeEventListener('resize', updateContainerDimensions);
+      resizeObserver.disconnect();
     };
   }, [onContainerDimensionsChange, isMaximized]);
 
@@ -151,8 +156,20 @@ const PDFViewer: React.FC<PDFViewerProps> = ({
   };
 
   const handleToggleMaximize = () => {
-    setIsMaximized(!isMaximized);
-    console.log('PDF viewer', isMaximized ? 'minimized' : 'maximized');
+    const newMaximizedState = !isMaximized;
+    setIsMaximized(newMaximizedState);
+    console.log('PDF viewer', newMaximizedState ? 'maximized' : 'minimized');
+    
+    // Force a re-render of dimensions after state change
+    setTimeout(() => {
+      if (viewerRef.current && onContainerDimensionsChange) {
+        const rect = viewerRef.current.getBoundingClientRect();
+        onContainerDimensionsChange({
+          width: rect.width,
+          height: rect.height
+        });
+      }
+    }, 100);
   };
 
   const handleDownload = () => {
@@ -237,37 +254,41 @@ const PDFViewer: React.FC<PDFViewerProps> = ({
             <div className="relative w-full h-full">
               <iframe
                 ref={iframeRef}
-                src={`${pdfUrl}#page=${currentPage}&toolbar=0&navpanes=0&scrollbar=0&view=FitV&zoom=${scale}${rotation ? `&rotate=${rotation}` : ''}`}
-                className="w-full h-full border-0"
+                src={`${pdfUrl}#page=${currentPage}&toolbar=0&navpanes=0&scrollbar=0&view=FitH&zoom=${scale}${rotation ? `&rotate=${rotation}` : ''}`}
+                className="w-full h-full border-0 pointer-events-auto"
                 title="PDF Preview"
+                style={{ pointerEvents: 'none' }}
                 onLoad={() => {
                   console.log('PDF loaded successfully, page:', currentPage, 'zoom:', scale + '%', 'rotation:', rotation + '°');
                 }}
               />
               
-              {/* Signature Overlays for current page */}
-              {signatures
-                .filter(sig => sig.pageNumber === currentPage)
-                .map((sig) => (
-                  <DraggableSignature
-                    key={sig.id}
-                    signature={sig.signature}
-                    initialX={sig.x}
-                    initialY={sig.y}
-                    onPositionChange={(x, y) => onSignaturePositionChange(sig.id, x, y)}
-                    onRemove={() => onSignatureRemove(sig.id)}
-                    containerWidth={viewerRef.current?.clientWidth || 800}
-                    containerHeight={isMaximized ? window.innerHeight * 0.9 - 100 : 700}
-                    scale={scale / 100}
-                  />
-                ))}
+              {/* Signature Overlays for current page - positioned above iframe */}
+              <div className="absolute inset-0 pointer-events-none z-10">
+                {signatures
+                  .filter(sig => sig.pageNumber === currentPage)
+                  .map((sig) => (
+                    <div key={sig.id} className="pointer-events-auto">
+                      <DraggableSignature
+                        signature={sig.signature}
+                        initialX={sig.x}
+                        initialY={sig.y}
+                        onPositionChange={(x, y) => onSignaturePositionChange(sig.id, x, y)}
+                        onRemove={() => onSignatureRemove(sig.id)}
+                        containerWidth={viewerRef.current?.clientWidth || 800}
+                        containerHeight={isMaximized ? window.innerHeight * 0.9 - 100 : 700}
+                        scale={scale / 100}
+                      />
+                    </div>
+                  ))}
+              </div>
             </div>
           )}
         </div>
 
         {/* Maximize overlay close button */}
         {isMaximized && (
-          <div className="absolute top-2 right-2">
+          <div className="absolute top-2 right-2 z-50">
             <Button variant="outline" size="sm" onClick={handleToggleMaximize}>
               <Minimize2 className="h-4 w-4" />
             </Button>
