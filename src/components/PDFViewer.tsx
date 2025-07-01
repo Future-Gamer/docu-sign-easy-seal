@@ -2,7 +2,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { ZoomIn, ZoomOut, Download, ChevronLeft, ChevronRight, RotateCw } from 'lucide-react';
+import { ZoomIn, ZoomOut, Download, ChevronLeft, ChevronRight, RotateCw, Maximize2, Minimize2 } from 'lucide-react';
 import DraggableSignature from './DraggableSignature';
 
 interface PDFViewerProps {
@@ -32,9 +32,9 @@ const PDFViewer: React.FC<PDFViewerProps> = ({
   const [totalPages, setTotalPages] = useState(1);
   const [isLoading, setIsLoading] = useState(true);
   const [rotation, setRotation] = useState(0);
+  const [isMaximized, setIsMaximized] = useState(false);
   const viewerRef = useRef<HTMLDivElement>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
-  const scrollCheckIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   // Zoom levels in percentages - more granular control
   const zoomLevels = [10, 25, 50, 75, 100, 125, 150, 175, 200, 250, 300, 400, 500];
@@ -82,81 +82,11 @@ const PDFViewer: React.FC<PDFViewerProps> = ({
   useEffect(() => {
     if (pdfUrl && iframeRef.current) {
       const rotationParam = rotation ? `&rotate=${rotation}` : '';
-      const newSrc = `${pdfUrl}#page=${currentPage}&toolbar=0&navpanes=0&scrollbar=1&view=FitH&zoom=${scale}${rotationParam}`;
+      // Remove scrollbar and use FitV to fit the page vertically
+      const newSrc = `${pdfUrl}#page=${currentPage}&toolbar=0&navpanes=0&scrollbar=0&view=FitV&zoom=${scale}${rotationParam}`;
       iframeRef.current.src = newSrc;
     }
   }, [pdfUrl, currentPage, scale, rotation]);
-
-  // Enhanced scroll detection for page changes
-  const detectCurrentPage = useCallback(() => {
-    const iframe = iframeRef.current;
-    if (!iframe) return;
-
-    try {
-      const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
-      if (iframeDoc) {
-        const scrollTop = iframeDoc.documentElement.scrollTop || iframeDoc.body.scrollTop;
-        const scrollHeight = iframeDoc.documentElement.scrollHeight || iframeDoc.body.scrollHeight;
-        const clientHeight = iframeDoc.documentElement.clientHeight || iframeDoc.body.clientHeight;
-        
-        if (scrollHeight > clientHeight) {
-          // Calculate current page based on scroll position
-          const scrollPercentage = scrollTop / (scrollHeight - clientHeight);
-          const estimatedPage = Math.max(1, Math.min(Math.ceil((scrollPercentage * totalPages) + 0.3), totalPages));
-          
-          if (estimatedPage !== currentPage && estimatedPage >= 1 && estimatedPage <= totalPages) {
-            console.log('Page changed via scroll:', estimatedPage);
-            setCurrentPage(estimatedPage);
-          }
-        }
-      }
-    } catch (error) {
-      // Cross-origin restrictions prevent access
-      console.log('Cannot access iframe content for scroll detection');
-    }
-  }, [currentPage, totalPages]);
-
-  // Set up scroll detection
-  useEffect(() => {
-    const iframe = iframeRef.current;
-    if (!iframe) return;
-
-    const setupScrollDetection = () => {
-      // Clear existing interval
-      if (scrollCheckIntervalRef.current) {
-        clearInterval(scrollCheckIntervalRef.current);
-      }
-
-      // Set up periodic scroll checking
-      scrollCheckIntervalRef.current = setInterval(detectCurrentPage, 500);
-      
-      try {
-        const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
-        if (iframeDoc) {
-          const handleScroll = () => detectCurrentPage();
-          iframeDoc.addEventListener('scroll', handleScroll);
-          
-          return () => {
-            iframeDoc.removeEventListener('scroll', handleScroll);
-            if (scrollCheckIntervalRef.current) {
-              clearInterval(scrollCheckIntervalRef.current);
-            }
-          };
-        }
-      } catch (error) {
-        console.log('Cannot access iframe for direct scroll events, using interval method');
-      }
-    };
-
-    iframe.addEventListener('load', setupScrollDetection);
-    
-    return () => {
-      iframe.removeEventListener('load', setupScrollDetection);
-      if (scrollCheckIntervalRef.current) {
-        clearInterval(scrollCheckIntervalRef.current);
-      }
-    };
-  }, [detectCurrentPage]);
 
   // Notify parent component of container dimension changes
   useEffect(() => {
@@ -178,7 +108,7 @@ const PDFViewer: React.FC<PDFViewerProps> = ({
     return () => {
       window.removeEventListener('resize', updateContainerDimensions);
     };
-  }, [onContainerDimensionsChange]);
+  }, [onContainerDimensionsChange, isMaximized]);
 
   const handleZoomIn = () => {
     const currentIndex = zoomLevels.findIndex(level => level >= scale);
@@ -203,12 +133,6 @@ const PDFViewer: React.FC<PDFViewerProps> = ({
       const newPage = currentPage + 1;
       setCurrentPage(newPage);
       console.log('Next page:', newPage);
-      
-      // Force iframe to navigate to specific page
-      if (iframeRef.current && pdfUrl) {
-        const rotationParam = rotation ? `&rotate=${rotation}` : '';
-        iframeRef.current.src = `${pdfUrl}#page=${newPage}&toolbar=0&navpanes=0&scrollbar=1&view=FitH&zoom=${scale}${rotationParam}`;
-      }
     }
   };
 
@@ -217,12 +141,6 @@ const PDFViewer: React.FC<PDFViewerProps> = ({
       const newPage = currentPage - 1;
       setCurrentPage(newPage);
       console.log('Previous page:', newPage);
-      
-      // Force iframe to navigate to specific page
-      if (iframeRef.current && pdfUrl) {
-        const rotationParam = rotation ? `&rotate=${rotation}` : '';
-        iframeRef.current.src = `${pdfUrl}#page=${newPage}&toolbar=0&navpanes=0&scrollbar=1&view=FitH&zoom=${scale}${rotationParam}`;
-      }
     }
   };
 
@@ -230,6 +148,11 @@ const PDFViewer: React.FC<PDFViewerProps> = ({
     const newRotation = (rotation + 90) % 360;
     setRotation(newRotation);
     console.log('Rotating PDF to:', newRotation + '°');
+  };
+
+  const handleToggleMaximize = () => {
+    setIsMaximized(!isMaximized);
+    console.log('PDF viewer', isMaximized ? 'minimized' : 'maximized');
   };
 
   const handleDownload = () => {
@@ -252,8 +175,10 @@ const PDFViewer: React.FC<PDFViewerProps> = ({
     );
   }
 
+  const containerHeight = isMaximized ? '90vh' : '700px';
+
   return (
-    <Card className={`bg-white border-gray-200 ${className}`}>
+    <Card className={`bg-white border-gray-200 ${className} ${isMaximized ? 'fixed inset-4 z-50' : ''}`}>
       <CardContent className="p-4">
         {/* PDF Controls */}
         <div className="flex items-center justify-between mb-4 p-3 bg-gray-50 rounded-lg border">
@@ -293,6 +218,9 @@ const PDFViewer: React.FC<PDFViewerProps> = ({
             <Button variant="outline" size="sm" onClick={handleRotate}>
               <RotateCw className="h-4 w-4" />
             </Button>
+            <Button variant="outline" size="sm" onClick={handleToggleMaximize}>
+              {isMaximized ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+            </Button>
             <Button variant="outline" size="sm" onClick={handleDownload}>
               <Download className="h-4 w-4" />
             </Button>
@@ -303,13 +231,13 @@ const PDFViewer: React.FC<PDFViewerProps> = ({
         <div 
           ref={viewerRef}
           className="relative w-full bg-gray-100 rounded-lg overflow-hidden border border-gray-200"
-          style={{ height: '700px' }}
+          style={{ height: containerHeight }}
         >
           {pdfUrl && (
             <div className="relative w-full h-full">
               <iframe
                 ref={iframeRef}
-                src={`${pdfUrl}#page=${currentPage}&toolbar=0&navpanes=0&scrollbar=1&view=FitH&zoom=${scale}${rotation ? `&rotate=${rotation}` : ''}`}
+                src={`${pdfUrl}#page=${currentPage}&toolbar=0&navpanes=0&scrollbar=0&view=FitV&zoom=${scale}${rotation ? `&rotate=${rotation}` : ''}`}
                 className="w-full h-full border-0"
                 title="PDF Preview"
                 onLoad={() => {
@@ -329,13 +257,22 @@ const PDFViewer: React.FC<PDFViewerProps> = ({
                     onPositionChange={(x, y) => onSignaturePositionChange(sig.id, x, y)}
                     onRemove={() => onSignatureRemove(sig.id)}
                     containerWidth={viewerRef.current?.clientWidth || 800}
-                    containerHeight={700}
+                    containerHeight={isMaximized ? window.innerHeight * 0.9 - 100 : 700}
                     scale={scale / 100}
                   />
                 ))}
             </div>
           )}
         </div>
+
+        {/* Maximize overlay close button */}
+        {isMaximized && (
+          <div className="absolute top-2 right-2">
+            <Button variant="outline" size="sm" onClick={handleToggleMaximize}>
+              <Minimize2 className="h-4 w-4" />
+            </Button>
+          </div>
+        )}
       </CardContent>
     </Card>
   );
